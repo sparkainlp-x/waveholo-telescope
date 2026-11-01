@@ -87,10 +87,8 @@ def run_condition(*, seed, n=128, radius=32, true_distance_m=5.0e-3,
 
     reconstructed_measured = angular_spectrum(noisy_hologram, -measured_distance, dx=DX, wl=WL)
     reconstructed_true = angular_spectrum(noisy_hologram, -true_distance_m, dx=DX, wl=WL)
-    _, _, eroded_mask = pupil_grid(n, radius)
-    eroded = eroded_mask  # placeholder replaced below
-    rho, _, raw_mask = pupil_grid(n, radius)
-    eroded = eroded_mask_fn(rho, radius, 2)
+    rho, _, _ = pupil_grid(n, radius)
+    eroded = eroded_mask(rho, radius, 2)
 
     rms_measured = phase_rms_error(reconstructed_measured, true_phase, eroded)
     rms_true = phase_rms_error(reconstructed_true, true_phase, eroded)
