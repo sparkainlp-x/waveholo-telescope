@@ -1,9 +1,0 @@
-LICENSE
-README.md
-pyproject.toml
-tests/tests.py
-waveholo_telescope.egg-info/PKG-INFO
-waveholo_telescope.egg-info/SOURCES.txt
-waveholo_telescope.egg-info/dependency_links.txt
-waveholo_telescope.egg-info/requires.txt
-waveholo_telescope.egg-info/top_level.txt

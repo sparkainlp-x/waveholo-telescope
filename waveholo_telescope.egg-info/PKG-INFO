@@ -1,8 +1,0 @@
-Metadata-Version: 2.4
-Name: waveholo-telescope
-Version: 0.1.0
-Summary: WaveHolo off-axis holography pipeline pointed at a telescope pupil (synthetic)
-License: AGPL-3.0-only
-License-File: LICENSE
-Requires-Dist: numpy
-Dynamic: license-file
