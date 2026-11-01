@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "waveholo-telescope"
+version = "0.1.1"
+description = "WaveHolo off-axis holography pipeline pointed at a telescope pupil (synthetic)"
+license = {text = "AGPL-3.0-only"}
+dependencies = ["numpy"]
+
+[tool.setuptools.packages.find]
+include = ["waveholo_telescope*"]

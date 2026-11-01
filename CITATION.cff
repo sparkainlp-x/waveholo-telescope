@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+title: waveholo-telescope
+message: "If you use this software, please cite it as below."
+type: software
+authors:
+  - family-names: Brisson
+    given-names: Jean-François
+    orcid: https://orcid.org/0009-0000-9778-5374
+    affiliation: Spark AI NLP
+version: 0.1.0
+license: AGPL-3.0-only
+repository-code: https://github.com/sparkainlp-x/waveholo-telescope
+abstract: >-
+  WaveHolo's off-axis digital holography pipeline pointed at a
+  telescope pupil: a distant star through a circular pupil with
+  Zernike aberrations, recorded as an off-axis hologram and
+  reconstructed, with the pupil plane found by aperture contrast
+  and the wavefront compared against injected ground truth.
+  Synthetic only; no real telescope claim.
