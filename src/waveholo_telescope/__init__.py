@@ -1,3 +1,6 @@
+# Copyright (C) 2026 Jean-François Brisson
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """waveholo-telescope: WaveHolo's off-axis holography pipeline pointed
 at a telescope pupil (synthetic only).
 

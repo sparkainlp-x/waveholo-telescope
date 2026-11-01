@@ -1,3 +1,6 @@
+# Copyright (C) 2026 Jean-François Brisson
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """Angular-spectrum propagation, the same kernel as waveholo v0.1.5.
 
 Bench parameters are WaveHolo's own, kept deliberately so this

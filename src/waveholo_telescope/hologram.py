@@ -1,3 +1,6 @@
+# Copyright (C) 2026 Jean-François Brisson
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """Off-axis hologram recording and sideband reconstruction.
 
 Same formulas as waveholo v0.1.5, unchanged: H = |U + R|^2 with a

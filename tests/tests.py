@@ -1,3 +1,6 @@
+# Copyright (C) 2026 Jean-François Brisson
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """Tests for waveholo-telescope. Run from the package root: python3 tests/tests.py.
 
 Pins are set BELOW measured performance with margin, never at the

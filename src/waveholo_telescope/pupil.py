@@ -1,3 +1,6 @@
+# Copyright (C) 2026 Jean-François Brisson
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """Telescope pupil: a circular aperture with Zernike aberrations.
 
 The pupil field is P = A * exp(i phi), where A is 1 inside a disk

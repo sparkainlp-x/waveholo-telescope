@@ -1,3 +1,6 @@
+# Copyright (C) 2026 Jean-François Brisson
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """Focus and wavefront metrics for the telescope pupil.
 
 aperture_contrast (PRIMARY focus metric, MAXIMAL at focus):

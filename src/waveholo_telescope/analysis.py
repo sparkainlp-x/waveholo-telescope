@@ -1,3 +1,6 @@
+# Copyright (C) 2026 Jean-François Brisson
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """Reproducible focus analysis helpers for synthetic and camera data.
 
 The focus score is deliberately aperture contrast, not phase uniformity: a

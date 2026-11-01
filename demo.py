@@ -1,3 +1,6 @@
+# Copyright (C) 2026 Jean-François Brisson
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """Demo: WaveHolo's pipeline pointed at a telescope pupil.
 
 A distant star through a circular pupil (radius 64 px) carrying
