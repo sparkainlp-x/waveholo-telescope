@@ -126,3 +126,13 @@ The project remains synthetic-only. Before using camera or telescope data,
 follow `PHYSICAL_READINESS.md`, which specifies calibration, sideband
 separation checks, bench validation, acceptance reporting, and limitations
 that must be addressed before an instrument claim.
+
+## Documentation
+
+- [Technical documentation](docs/TECHNICAL_DOCUMENTATION.md): mathematical
+  model, numerical conventions, processing flow, validation, reproducibility,
+  and laboratory transition plan.
+- [API reference](docs/API_REFERENCE.md): public constants, functions,
+  parameters, return values, validation behavior, and examples.
+- [Physical-readiness plan](PHYSICAL_READINESS.md): calibration and bench
+  validation protocol before using recorded camera or telescope data.
