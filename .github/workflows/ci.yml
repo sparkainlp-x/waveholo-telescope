@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+      - name: Run tests
+        run: python -m unittest discover -s tests -v
+      - name: Run demo
+        run: python demo.py
+
+  benchmark:
+    name: Smoke benchmark
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+      - name: Run smoke benchmark
+        run: worldholo-benchmark --config configs/v0.2.0-smoke.json --output results/smoke
+      - name: Validate artifacts
+        run: |
+          test -f results/smoke/manifest.json
+          test -f results/smoke/analysis.json
+          test -f results/smoke/claims.json
+          test -f results/smoke/report.md
+          test -f results/smoke/checksums.sha256
+          cd results/smoke
+          sha256sum --check checksums.sha256
+      - name: Enforce synthetic-only claim gate
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          claims = json.loads(Path('results/smoke/claims.json').read_text())
+          if claims.get('scope') != 'synthetic_simulation_only':
+              raise SystemExit('Claim scope must be synthetic_simulation_only')
+          if claims.get('claim_gate_status') not in {'pass', 'fail', 'inconclusive'}:
+              raise SystemExit('Invalid claim gate status')
+          forbidden = ['telescope-ready', 'works on telescopes', 'validates physical holography', 'ready for observatory deployment']
+          text = json.dumps(claims).lower()
+          if any(item in text for item in forbidden):
+              raise SystemExit('Forbidden physical claim detected')
+          print('Claim gate:', claims['claim_gate_status'])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: waveholo-smoke-benchmark-${{ github.run_id }}
+          path: results/smoke
+          if-no-files-found: error
+
+  reproducibility:
+    name: Benchmark reproducibility
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+      - name: Run benchmark twice
+        run: |
+          worldholo-benchmark --config configs/v0.2.0-smoke.json --output results/run-a
+          worldholo-benchmark --config configs/v0.2.0-smoke.json --output results/run-b
+      - name: Compare deterministic outputs
+        run: |
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+          def digest(path):
+              return hashlib.sha256(path.read_bytes()).hexdigest()
+          for name in ('analysis.json', 'claims.json', 'report.md'):
+              a = Path('results/run-a') / name
+              b = Path('results/run-b') / name
+              if not a.exists() or not b.exists():
+                  raise SystemExit(f'Missing artifact: {name}')
+              if digest(a) != digest(b):
+                  raise SystemExit(f'Nondeterministic artifact: {name}')
+          print('Reproducibility check passed.')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: waveholo-reproducibility-${{ github.run_id }}
+          path: |
+            results/run-a
+            results/run-b
+          if-no-files-found: error

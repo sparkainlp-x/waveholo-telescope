@@ -1,13 +1,39 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "waveholo-telescope"
-version = "0.1.1"
-description = "WaveHolo off-axis holography pipeline pointed at a telescope pupil (synthetic)"
+version = "0.2.0"
+description = "Synthetic-only off-axis digital holography pipeline for a telescope-pupil model"
+readme = "README.md"
+requires-python = ">=3.10"
 license = {text = "AGPL-3.0-only"}
-dependencies = ["numpy"]
+authors = [
+  {name = "Jean-François Brisson"}
+]
+keywords = ["holography", "optics", "wavefront", "telescope", "simulation"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Physics"
+]
+dependencies = ["numpy>=1.24"]
+
+[project.urls]
+Repository = "https://github.com/sparkainlp-x/waveholo-telescope"
+Changelog = "https://github.com/sparkainlp-x/waveholo-telescope/blob/main/CHANGELOG.md"
+Issues = "https://github.com/sparkainlp-x/waveholo-telescope/issues"
+
+[project.scripts]
+worldholo-benchmark = "waveholo_telescope.benchmark:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
