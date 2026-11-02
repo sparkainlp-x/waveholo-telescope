@@ -40,9 +40,11 @@ def focus_sweep(base_field, pupil_mask, distances, *, dx=None, wl=None):
     base = np.asarray(base_field, dtype=complex)
     mask = np.asarray(pupil_mask, dtype=bool)
     d = np.asarray(list(distances), dtype=float)
-    if d.ndim != 1 or d.size == 0 or not np.isfinite(d).all() or (d < 0).any():
-        raise ValueError("distances must be a non-empty 1-D array of finite non-negative metres")
-    if base.shape != mask.shape:
+    if (d.ndim != 1 or d.size == 0 or not np.isfinite(d).all()
+            or (d < 0).any() or (d.size > 1 and not np.all(np.diff(d) > 0))):
+        raise ValueError("distances must be finite, non-negative, and strictly increasing")
+    if (base.ndim != 2 or mask.ndim != 2 or base.shape != mask.shape
+            or not mask.any() or mask.all()):
         raise ValueError("base_field and pupil_mask must have matching shapes")
     kwargs = {}
     if dx is not None:
@@ -62,29 +64,52 @@ def parabolic_peak(distances, scores):
 
     The returned dictionary includes the sampled maximum, refined location,
     local curvature, and a conservative half-step resolution. Refinement is
-    only applied when the maximum is interior and the parabola is concave.
+    Local quadratic fitting works on regular or irregular strictly increasing
+    grids. Refinement is applied only when the maximum is interior, the
+    parabola is concave, and its vertex lies between neighbouring samples.
+    Plateau and weak-curvature flags describe sampling diagnostics, not
+    confidence intervals.
     """
     d = np.asarray(distances, dtype=float)
     s = np.asarray(scores, dtype=float)
-    if d.ndim != 1 or s.shape != d.shape or d.size < 1:
+    if d.ndim != 1 or s.ndim != 1 or s.shape != d.shape or d.size < 1:
         raise ValueError("distances and scores must be matching non-empty 1-D arrays")
     if not np.isfinite(d).all() or not np.isfinite(s).all():
         raise ValueError("distances and scores must be finite")
+    if d.size > 1 and not np.all(np.diff(d) > 0):
+        raise ValueError("distances must be strictly increasing with no duplicates")
     i = int(np.argmax(s))
     refined = float(d[i])
-    curvature = np.nan
+    curvature = None
+    refinement_applied = False
     if 0 < i < d.size - 1:
-        step_left, step_right = d[i] - d[i - 1], d[i + 1] - d[i]
-        if np.isclose(step_left, step_right) and step_left > 0:
-            denom = s[i - 1] - 2.0 * s[i] + s[i + 1]
-            curvature = float(denom / step_left**2)
-            if denom < 0:
-                refined += float(0.5 * (s[i - 1] - s[i + 1]) / denom * step_left)
+        offsets = d[i - 1:i + 2] - d[i]
+        quadratic, linear, _ = np.linalg.solve(
+            np.column_stack((offsets**2, offsets, np.ones(3))), s[i - 1:i + 2]
+        )
+        curvature = float(2 * quadratic)
+        vertex = -linear / (2 * quadratic) if quadratic != 0 else np.nan
+        if quadratic < 0 and d[i - 1] - d[i] <= vertex <= d[i + 1] - d[i]:
+            refined += float(vertex)
+            refinement_applied = True
+    peak_tolerance = max(1e-12, 1e-12 * float(np.max(np.abs(s))))
+    plateau = bool(np.count_nonzero(np.abs(s - s[i]) <= peak_tolerance) > 1)
+    if d.size > 1:
+        step = float(np.min(np.diff(d)))
+        curvature_floor = 1e-6 * max(float(np.ptp(s)), np.finfo(float).eps) / step**2
+        weak_curvature = curvature is None or abs(curvature) <= curvature_floor
+        resolution = 0.5 * step
+    else:
+        weak_curvature = True
+        resolution = None
     return {
         "sampled_distance_m": float(d[i]),
         "refined_distance_m": refined,
         "score": float(s[i]),
         "curvature_per_m2": curvature,
-        "resolution_half_step_m": float(0.5 * np.min(np.diff(d))) if d.size > 1 else np.nan,
+        "resolution_half_step_m": resolution,
         "at_boundary": bool(i == 0 or i == d.size - 1),
+        "plateau": plateau,
+        "weak_curvature": bool(weak_curvature),
+        "refinement_applied": refinement_applied,
     }

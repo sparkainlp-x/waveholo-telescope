@@ -25,25 +25,31 @@ WL = 532e-9
 CAR_DEFAULT = 80
 WIN_DEFAULT = 48
 
+TRANSFER_CACHE_MAXSIZE = 256
 _transfer_cache = {}
 
 
 def _transfer(z, n, dx, wl):
-    if not isinstance(n, (int, np.integer)) or n <= 0:
+    if (isinstance(n, (bool, np.bool_))
+            or not isinstance(n, (int, np.integer)) or n <= 0):
         raise ValueError("n must be a positive integer")
     if not np.isfinite(dx) or dx <= 0:
         raise ValueError("dx must be a positive finite number of metres")
     if not np.isfinite(wl) or wl <= 0:
         raise ValueError("wl must be a positive finite number of metres")
     key = (float(z), n, dx, wl)
-    if key not in _transfer_cache:
-        fx = np.fft.fftfreq(n, d=dx)
-        FX, FY = np.meshgrid(fx, fx)
-        k = 2 * np.pi / wl
-        arg = 1.0 - (wl * FX) ** 2 - (wl * FY) ** 2
-        _transfer_cache[key] = np.where(
-            arg > 0, np.exp(1j * k * z * np.sqrt(np.maximum(arg, 0))), 0
-        )
+    if key in _transfer_cache:
+        return _transfer_cache[key]
+    fx = np.fft.fftfreq(n, d=dx)
+    FX, FY = np.meshgrid(fx, fx)
+    k = 2 * np.pi / wl
+    arg = 1.0 - (wl * FX) ** 2 - (wl * FY) ** 2
+    transfer = np.where(
+        arg > 0, np.exp(1j * k * z * np.sqrt(np.maximum(arg, 0))), 0
+    )
+    if len(_transfer_cache) >= TRANSFER_CACHE_MAXSIZE:
+        _transfer_cache.pop(next(iter(_transfer_cache)))
+    _transfer_cache[key] = transfer
     return _transfer_cache[key]
 
 
