@@ -1,6 +1,6 @@
 # waveholo-telescope API reference
 
-This reference documents the public Python API in version 0.1.1. Import from `waveholo_telescope` for the stable top-level functions and constants, or from the named submodules when working with implementation-specific organization.
+This reference documents the public Python API in version 0.2.0. Import from `waveholo_telescope` for the stable top-level functions and constants, or from the named submodules when working with implementation-specific organization.
 
 ```python
 import waveholo_telescope as wh
@@ -24,7 +24,7 @@ PYTHONPATH=src python3 -c "import waveholo_telescope as wh; print(wh.__version__
 
 ### `waveholo_telescope.__version__`
 
-Current package version string: `"0.1.1"`.
+Current package version string: `"0.2.0"`.
 
 ## Public constants
 
@@ -185,7 +185,7 @@ Square complex reconstructed field at the sensor sampling grid.
 
 **Physical note**
 
-The crop is a hard rectangular filter. The caller must verify that the measured sideband is separated from DC and the conjugate sideband.
+The crop is a hard rectangular filter. A crop-fit check is not evidence that the measured sideband is optically separated from DC and the conjugate sideband; the caller must verify separation from measured spectral support.
 
 ### `offaxis_field(sensor_field, car=CAR_DEFAULT, win=WIN_DEFAULT)`
 
@@ -279,7 +279,7 @@ Evaluate aperture contrast over candidate back-propagation distances.
 
 - `base_field`: reconstructed complex sensor-plane field.
 - `pupil_mask`: Boolean expected pupil support with matching shape.
-- `distances`: non-empty 1-D iterable of finite non-negative distances in metres.
+- `distances`: non-empty 1-D iterable of finite, non-negative, strictly increasing distances in metres.
 - `dx`: optional propagation pitch in metres. If omitted, `DX` is used.
 - `wl`: optional wavelength in metres. If omitted, `WL` is used.
 
@@ -319,11 +319,20 @@ A dictionary containing:
 | `sampled_distance_m` | Distance at the sampled maximum |
 | `refined_distance_m` | Quadratic refinement when the maximum is interior and the local parabola is concave; otherwise sampled distance |
 | `score` | Score at the sampled maximum |
-| `curvature_per_m2` | Local second difference converted to inverse-square metres, or `nan` when unavailable |
-| `resolution_half_step_m` | Half the smallest adjacent distance step, or `nan` for one sample |
+| `curvature_per_m2` | Fitted local curvature, or JSON-safe `null` when unavailable |
+| `resolution_half_step_m` | Half the smallest adjacent distance step, or `null` for one sample |
 | `at_boundary` | Whether the sampled maximum is the first or last point |
+| `plateau` | Whether multiple samples share the maximum within numerical tolerance |
+| `weak_curvature` | Whether local curvature is too weak to support stable interpolation |
+| `refinement_applied` | Whether an interior concave fit had a vertex within adjacent samples |
 
-Refinement is applied only for an interior maximum with equal positive adjacent spacing and negative second difference. It is a local interpolation, not a confidence interval. A boundary maximum should trigger a wider or better-centered sweep before interpretation.
+Distances may be irregular but must be strictly increasing and nonduplicate. Refinement is a local quadratic interpolation, not a confidence interval. A boundary maximum should trigger a wider or better-centered sweep before interpretation.
+
+## Statistical utility conventions
+
+`paired_bootstrap_difference` reports the first column minus the second column for each pair before resampling. `power_analysis_proportion` estimates equal per-group sample size for an independent two-group proportion comparison using a two-sided normal approximation and pooled null variance. For example, `power_analysis_proportion(0.05, 0.15, alpha=0.05, power=0.8)` returns 141 observations per group. These are planning approximations, not measured performance.
+
+The claim gate reports `pass`, `fail`, or `insufficient_evidence`; scientific acceptance remains insufficient until supported by a frozen protocol. The smoke profile checks explicitly configured synthetic engineering thresholds only, and `physical_claim` remains false.
 
 ## Top-level exports
 
@@ -358,16 +367,17 @@ from waveholo_telescope import (
 Run the package's regression suite from the repository root:
 
 ```sh
-python3 tests/tests.py
+python -m unittest discover -s tests -v
 ```
 
 Run the synthetic benchmark:
 
 ```sh
-python3 demo.py
+python demo.py
+waveholo-benchmark --config smoke --output results/smoke
 ```
 
-The test suite is based on Python's standard `unittest` and NumPy; it does not require SciPy. Test thresholds are regression guards below measured demo performance, not universal physical acceptance thresholds.
+The test suite is based on Python's standard `unittest` and NumPy; it does not require SciPy. Test thresholds are regression guards, not universal physical acceptance thresholds. `worldholo-benchmark` is retained as a compatibility alias.
 
 ## Compatibility and limitations
 

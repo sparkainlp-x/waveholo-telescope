@@ -1,4 +1,4 @@
-# waveholo-telescope v0.1.0
+# waveholo-telescope v0.2.0
 
 WaveHolo's off-axis digital holography pipeline, pointed at a
 telescope pupil. A distant star through a circular pupil carrying
@@ -7,10 +7,12 @@ an off-axis hologram, and reconstructed: the pupil plane is found
 by aperture contrast, and the wavefront at that plane is compared
 against the injected aberration. NumPy only, AGPL-3.0-only.
 
-Bench parameters are WaveHolo's own, kept deliberately so this
-adaptation is comparable to the lab bench: wavelength 532 nm,
-pixel pitch 6.5 um, grid 256x256, carrier 80 bins, sideband
-half-width 48 bins, pupil-to-sensor distance 5.00 mm.
+Bench parameters are WaveHolo's own, kept deliberately so this adaptation is
+comparable to the lab bench: wavelength 532 nm, pixel pitch 6.5 um, grid
+256x256, carrier 80 bins, sideband half-width 48 bins, pupil-to-sensor distance
+5.00 mm. Smaller documented numerical presets are 128:(40, 24) and
+64:(20, 12), where each pair is (carrier, half-width). Other grids require
+explicit carrier/window settings.
 
 ## Geometry
 
@@ -42,34 +44,32 @@ amplitude object:
   mask (2 px, because the hard aperture edge is blurred by the
   sideband window). 1 is perfect, 0 is random.
 
-## Measured bars (demo.py, 256x256)
+## Reproducible measurements
 
-- T1 focus: aperture-contrast peak 5.138 mm, error +0.138 mm
-  against the true 5.00 mm -- but the contrast at the true plane
-  is 0.9976 against a peak of 0.9976 (difference 0.0000 to four
-  decimals). The peak is FLAT-TOPPED: on this geometry the metric
-  locates the pupil plane only to ~±0.25 mm (the sweep step), not
-  better. That is a property of the metric, not a calibration
-  error, and it costs almost nothing: see T2.
-- T2 wavefront at the measured focus: RMS error 0.0066 waves,
-  agreement 0.9991 (eroded mask, 2 px; piston removed). At the true
-  plane the RMS is 0.0064 waves -- the ±0.25 mm focus uncertainty
-  costs 0.0002 waves.
-- T3 null control (no aberrations, true plane): RMS error
-  0.0057 waves. That is the pipeline floor (sideband windowing
-  plus discretization): the T2 error is essentially the floor,
-  not aberration-dependent error.
-- T4 noise (Gaussian noise, std 5% of mean hologram, clipped at
-  zero like a real sensor): focus 5.129 mm (error +0.129 mm),
-  wavefront RMS 0.0070 waves, agreement 0.9990. Noise barely
-  degrades anything at this level.
-- T5 secondary readout: WaveHolo's phase_variance minimum on the
-  same sweep sits at the 10.000 mm sweep EDGE (value 0.7514) --
-  no interior dip at the pupil plane. On telescope pupil data the
-  candidate universal metric does NOT locate focus. This is a
-  measured negative, kept, not a footnote: phase_variance assumes
-  a near-uniform phase at focus, and a pupil's aberration phase
-  is genuinely non-uniform there.
+The benchmark records the real intensity hologram, adds deterministic
+Gaussian noise with standard deviation relative to mean intensity, clips at
+zero, and then reconstructs its complex baseband field. The benchmark reports
+the full phase-variance sweep and determines localization, boundary status,
+and error from the observed minimum; it does not assume a negative result.
+Only current outputs produced by the commands below are evidence. The
+Fourier-window fit check does not establish optical sideband separation.
+
+### Freshly regenerated demo and smoke results
+
+`python demo.py` (original 256×256 geometry): focus `5.138 mm` for a true
+`5.000 mm` plane; wrapped wavefront RMS `0.0066` waves at measured focus
+(`0.0064` at true focus); null-control RMS `0.0057` waves; 5% synthetic
+intensity noise gave `5.129 mm` focus and `0.0070` waves RMS. The measured
+phase-variance minimum was `10.000 mm`, at the sweep boundary, `+5.000 mm`
+from true focus; it did not localize focus on this run.
+
+The regenerated `waveholo-benchmark --config smoke` run (128×128, three
+seeds, 5% primary noise) had median wrapped RMS `0.011407` waves against the
+configured `0.010000` threshold, with `0/3` trials meeting it. Its synthetic
+claim gate therefore **failed**; no positive claim is made. The measured
+phase-variance minimum was `1.000 mm` from true focus in all three trials, so
+the recorded decision was `does_not_locate_focus`. These smoke metrics are
+engineering outputs, not physical or scientific validation.
 
 ## Two corrections made during the build
 
@@ -86,9 +86,15 @@ amplitude object:
 ## Run it
 
 ```sh
-python3 demo.py          # bars T1-T5 (256x256, seconds)
-python3 tests/tests.py   # 13 tests, from the package root (128x128)
+python -m unittest discover -s tests -v
+python demo.py
+waveholo-benchmark --config smoke --output results/smoke
 ```
+
+`worldholo-benchmark` remains an alias for compatibility. Packaged `smoke`
+and `primary` presets are also available after wheel installation. The
+smoke profile is an engineering check; a scientific profile remains
+insufficient evidence until a genuinely frozen scientific protocol exists.
 
 ## Honest limits
 
@@ -96,18 +102,17 @@ python3 tests/tests.py   # 13 tests, from the package root (128x128)
   this package, and nothing here is a claim about any real
   instrument, site, or adaptive-optics loop. The bars are
   ground-truth comparisons on simulated holograms.
-- The focus location is coarse (~±0.25 mm on this geometry) for
-  the flat-top reason above; the wavefront itself is recovered
-  far more precisely (0.0066 waves) because it is insensitive to
-  that focus error.
+- Focus sampling/refinement diagnostics (boundary, plateau, curvature and
+  resolution) are not confidence intervals.
 - The sideband window low-passes the wavefront: the recovered
   phase is the injected aberration smoothed by the window, and
   the pipeline floor (0.0057 waves) is the price.
 - Piston is unobservable, tip/tilt are excluded, the pupil is an
   ideal disk. A real pupil (obstruction, spiders, segments,
   atmosphere) would need those terms added and re-measured.
-- Authorship: Brisson only. No other author's code or paradigm
-  is contained in this package.
+- No physical camera/telescope validation, atmospheric turbulence,
+  adaptive-optics integration, or independent acquisition baseline is
+  included; these remain future work.
 
 ## Licence
 
@@ -115,12 +120,13 @@ AGPL-3.0-only. See `LICENSE`.
 
 ## Scientific-readiness additions
 
-The package now validates field shapes, finite camera values, physical
-propagation parameters, integer carrier/window settings, and Fourier
-sideband fit. It also exposes `focus_sweep` and `parabolic_peak` for
-reusable focus analysis. `parabolic_peak` reports boundary status and a
-sampling-resolution diagnostic; its refinement is not a statistical
-confidence interval.
+The package validates field shapes, finite camera values, physical
+propagation parameters, integer carrier/window settings, and Fourier array
+fit. The fixed 256x256 optical geometry remains unchanged. It exposes
+`focus_sweep` and `parabolic_peak`; the latter supports irregular increasing
+grids and reports boundary, plateau, curvature, and resolution diagnostics,
+not a statistical confidence interval. Reported phase RMS is wrapped RMS in
+waves after separate piston removal from recovered and injected phase.
 
 The project remains synthetic-only. Before using camera or telescope data,
 follow `PHYSICAL_READINESS.md`, which specifies calibration, sideband

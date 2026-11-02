@@ -22,7 +22,8 @@ from waveholo_telescope.hologram import (  # noqa: E402
 from waveholo_telescope.analysis import parabolic_peak  # noqa: E402
 from waveholo_telescope.metrics import (  # noqa: E402
     aperture_contrast, eroded_mask, phase_agreement, phase_rms_error)
-from waveholo_telescope.propagation import angular_spectrum  # noqa: E402
+from waveholo_telescope.propagation import (  # noqa: E402
+    DX, WL, TRANSFER_CACHE_MAXSIZE, _transfer, _transfer_cache, angular_spectrum)
 from waveholo_telescope.pupil import (  # noqa: E402
     pupil_field, pupil_grid, zernike_phase)
 
@@ -113,6 +114,18 @@ class TestPropagation(unittest.TestCase):
         with self.assertRaises(ValueError):
             reconstruct_field(np.zeros((N, N)), car=40.5, win=24)
 
+    def test_transfer_cache_is_bounded(self):
+        previous = dict(_transfer_cache)
+        try:
+            _transfer_cache.clear()
+            for index in range(TRANSFER_CACHE_MAXSIZE + 1):
+                _transfer(float(index), 64, DX, WL)
+            self.assertEqual(len(_transfer_cache), TRANSFER_CACHE_MAXSIZE)
+            self.assertNotIn((0.0, 64, DX, WL), _transfer_cache)
+        finally:
+            _transfer_cache.clear()
+            _transfer_cache.update(previous)
+
 
 class TestPipeline(unittest.TestCase):
     def test_hologram_nonnegative_and_mean(self):
@@ -148,6 +161,29 @@ class TestPipeline(unittest.TestCase):
         emask = eroded_mask(rho, RADIUS, 2)
         self.assertLess(phase_rms_error(plane, true_phase, emask), 0.03)
         self.assertGreater(phase_agreement(plane, true_phase, emask), 0.98)
+
+    def test_wrapped_rms_is_invariant_to_global_piston(self):
+        _, mask, true_phase = pupil_field(N, RADIUS, defocus=0.49)
+        field = np.zeros((N, N), dtype=complex)
+        field[mask] = np.exp(2j * np.pi * true_phase[mask])
+        piston_shifted = np.exp(1.37j) * field
+        self.assertLess(phase_rms_error(piston_shifted, true_phase, mask), 1e-12)
+        self.assertGreater(phase_agreement(piston_shifted, true_phase, mask), 1 - 1e-12)
+
+    def test_wrapped_rms_keeps_separate_piston_definition(self):
+        recovered = np.array([0.49, -0.49, 0.0])
+        truth = np.array([0.1, 0.2, -0.3])
+        field = np.exp(2j * np.pi * recovered)[None, :]
+        mask = np.ones(field.shape, dtype=bool)
+        separate_piston_rms = phase_rms_error(field, truth[None, :], mask)
+        relative = (recovered - truth + 0.5) % 1.0 - 0.5
+        relative_piston = np.angle(np.exp(2j * np.pi * relative).mean()) / (2 * np.pi)
+        relative_aligned_rms = np.sqrt(
+            np.mean(((relative - relative_piston + 0.5) % 1.0 - 0.5) ** 2)
+        )
+        self.assertAlmostEqual(separate_piston_rms, 0.0778888096369862)
+        self.assertAlmostEqual(relative_aligned_rms, 0.040277915813968355)
+        self.assertNotAlmostEqual(separate_piston_rms, relative_aligned_rms)
 
     def test_null_control(self):
         base, mask, true_phase, rho = _pipeline({})

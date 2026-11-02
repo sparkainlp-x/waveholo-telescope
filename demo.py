@@ -17,10 +17,10 @@ truth (bench parameters identical to waveholo v0.1.5):
   removed): RMS error in waves, circular agreement.
 - T3 null control: zero aberrations through the same pipeline;
   recovered phase RMS at the true plane.
-- T4 noise: hologram + Gaussian noise (std 5% of mean hologram,
-  clipped at zero like a real sensor), T1 and T2 repeated.
-- T5 secondary readout: WaveHolo's phase_variance peak on the
-  same sweep, compared against the aperture-contrast peak.
+- T4 noise: synthetic additive Gaussian intensity noise (std 5% of
+  mean hologram, clipped at zero), T1 and T2 repeated.
+- T5 secondary readout: WaveHolo's phase_variance minimum on the
+  same sweep, with boundary and localization diagnostics.
 
 Run from the package root: python3 demo.py
 """
@@ -33,6 +33,8 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "src"))
 
+from waveholo_telescope.analysis import focus_sweep, parabolic_peak  # noqa: E402
+from waveholo_telescope.benchmark import _add_sensor_noise  # noqa: E402
 from waveholo_telescope.hologram import (  # noqa: E402
     record_hologram, reconstruct_field)
 from waveholo_telescope.metrics import (  # noqa: E402
@@ -52,30 +54,28 @@ ERODE = 2
 def sweep(base, mask, true_phase, rho):
     """Back-propagation sweep: contrast + phase variance per distance."""
     distances = np.arange(0.0, 10.0e-3 + 1e-12, 0.25e-3)
-    contrasts = []
-    variances = []
-    for d in distances:
-        plane = angular_spectrum(base, -float(d))
-        contrasts.append(aperture_contrast(plane, mask))
-        variances.append(phase_variance(plane))
-    contrasts = np.array(contrasts)
-    variances = np.array(variances)
-    i = int(np.argmax(contrasts))
-    peak = float(distances[i])
-    if 0 < i < len(distances) - 1:
-        y0, y1, y2 = contrasts[i - 1], contrasts[i], contrasts[i + 1]
-        denom = y0 - 2 * y1 + y2
-        if denom != 0:
-            peak = float(distances[i] + 0.5 * (y0 - y2) / denom * 0.25e-3)
+    distances, contrasts = focus_sweep(base, mask, distances)
+    variances = np.array([
+        phase_variance(angular_spectrum(base, -float(distance)))
+        for distance in distances
+    ])
+    focus = parabolic_peak(distances, contrasts)
     j = int(np.argmin(variances))
+    variance_distance = float(distances[j])
+    localization_error = variance_distance - Z_TRUE
+    localizes_focus = abs(localization_error) <= float(np.min(np.diff(distances))) / 2
     return {
         "distances": distances,
         "contrasts": contrasts,
         "variances": variances,
-        "contrast_peak_mm": peak * 1e3,
-        "contrast_peak_value": float(contrasts[i]),
+        "focus": focus,
+        "contrast_peak_mm": float(focus["refined_distance_m"]) * 1e3,
+        "contrast_peak_value": float(focus["score"]),
         "phase_var_min_mm": float(distances[j]) * 1e3,
         "phase_var_min_value": float(variances[j]),
+        "phase_var_min_at_boundary": bool(j in (0, len(distances) - 1)),
+        "phase_var_localization_error_mm": localization_error * 1e3,
+        "phase_var_localizes_focus": bool(localizes_focus),
     }
 
 
@@ -90,12 +90,7 @@ def run_pipeline(aberrations, hologram_noise=0.0, seed=42):
     field, mask, true_phase = pupil_field(N, RADIUS, **aberrations)
     sensor = angular_spectrum(field, Z_TRUE)
     holo = record_hologram(sensor)
-    if hologram_noise > 0.0:
-        rng = np.random.default_rng(seed)
-        holo = np.clip(
-            holo + rng.normal(0.0, hologram_noise * holo.mean(),
-                              size=holo.shape),
-            0.0, None)
+    holo = _add_sensor_noise(holo, hologram_noise, np.random.default_rng(seed))
     base = reconstruct_field(holo)
     rho, _, _ = pupil_grid(N, RADIUS)
     return base, mask, true_phase, rho
@@ -138,10 +133,13 @@ def main():
           f"{result_n['contrast_peak_mm']:.3f} mm "
           f"(error {result_n['contrast_peak_mm'] - Z_TRUE * 1e3:+.3f} mm), "
           f"wavefront RMS {rms_n:.4f} waves, agreement {agr_n:.4f}")
-    print(f"T5 secondary (phase_variance minimum on the same sweep): "
+    print(f"T5 secondary (measured phase_variance minimum): "
           f"{result['phase_var_min_mm']:.3f} mm "
           f"(value {result['phase_var_min_value']:.4f}) vs "
-          f"aperture-contrast peak {result['contrast_peak_mm']:.3f} mm")
+          f"aperture-contrast peak {result['contrast_peak_mm']:.3f} mm; "
+          f"boundary={result['phase_var_min_at_boundary']}, "
+          f"localization error={result['phase_var_localization_error_mm']:+.3f} mm, "
+          f"localizes={result['phase_var_localizes_focus']}")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # waveholo-telescope technical documentation
 
-**Version:** 0.1.1  
+**Version:** 0.2.0
 **Status:** synthetic reconstruction benchmark; not telescope-validated  
 **License:** AGPL-3.0-only  
 **Language:** Python 3 with NumPy
@@ -106,6 +106,8 @@ The default synthetic bench parameters are:
 
 The physical sampling pitch must be the **effective** pitch at the modeled plane, including relay magnification. A nominal camera pixel pitch is not automatically the correct `dx` after optics.
 
+The documented numerical presets are `(grid, carrier, half-width) = (256, 80, 48), (128, 40, 24), (64, 20, 12)`. Other grid sizes require explicit carrier and window settings. The implementation checks Fourier-array fit only; it does not claim that a sideband is separated from DC and its conjugate.
+
 ### 3.3 Off-axis hologram recording
 
 The sensor field `U` is mixed with a unit-amplitude reference tilted along the x direction:
@@ -132,7 +134,7 @@ The reconstruction performs the following operations:
 4. Shift the crop to the centered baseband location by placing it back into an `N × N` zero-filled spectrum.
 5. Apply `ifftshift` and `ifft2` to obtain the reconstructed complex field.
 
-The filter is a hard rectangular crop. It therefore limits spatial bandwidth, blurs sharp pupil edges, and contributes to the measured null-control phase floor. The sideband must be separated from the DC and conjugate sideband in the actual camera spectrum; passing array-fit validation alone does not prove optical separation.
+The filter is a hard rectangular crop. It therefore limits spatial bandwidth, blurs sharp pupil edges, and contributes to the measured null-control phase floor. Sensor noise is added to the recorded real intensity hologram relative to its mean intensity, clipped at zero, and only then reconstructed. The sideband must be separated from the DC and conjugate sideband in the actual camera spectrum; passing array-fit validation alone does not prove optical separation.
 
 The current implementation assumes a square sensor, a horizontal integer-bin carrier, and a carrier sign convention consistent with `record_hologram`. Fractional-bin or arbitrary-angle carriers are not yet estimated automatically.
 
@@ -149,18 +151,18 @@ C = \frac{\langle |U|^2\rangle_{\mathrm{inside}}-
 
 The score is bounded by `[-1, 1]` when intensities are finite and non-negative. A clean, correctly focused pupil approaches `1` because energy is concentrated inside the known support. The focus sweep evaluates this score after back-propagating to candidate distances.
 
-`phase_variance` is retained as a secondary diagnostic only. It is an intensity-weighted circular variance of the whole field and assumes that a low-variance phase is desirable. In the included telescope-pupil simulation it selects the sweep edge rather than the pupil plane, which is an important negative result.
+`phase_variance` is retained as a secondary diagnostic only. It is an intensity-weighted circular variance of the whole field and assumes that a low-variance phase is desirable. The benchmark records it at every sweep distance, reports the measured minimum and boundary status, and decides localization by comparing the sampled minimum with synthetic true focus and half the minimum sweep interval. The historical negative result is retained only when the current sweep reproduces it.
 
 ### 3.6 Wavefront metrics
 
-Recovered and reference phases are represented in waves. Both recovered and true phases have their circular piston removed independently. The residual is wrapped to `[-0.5, 0.5)` waves before calculating:
+Recovered and reference phases are represented in waves. Both recovered and true phases have their circular piston removed independently; this is not relative-piston alignment. The residual is wrapped to `[-0.5, 0.5)` waves before calculating:
 
-- `phase_rms_error`: root-mean-square wrapped residual in waves.
+- `phase_rms_error`: root-mean-square wrapped residual in waves (wrapped RMS).
 - `phase_agreement`: magnitude of the mean residual phasor, from `0` for random residuals to `1` for perfect circular agreement.
 
 A linear Pearson correlation is deliberately not used for wrapped phase. A small physical residual crossing the `-0.5/+0.5` representation seam can appear as a large linear anticorrelation despite excellent circular agreement.
 
-The demo evaluates the wavefront on a mask eroded by two pixels to avoid interpreting the blurred hard-aperture edge as interior wavefront error.
+The demo evaluates the wavefront on a mask eroded by two pixels to avoid interpreting the blurred hard-aperture edge as interior wavefront error. Focus curvature and half-step resolution are sampling diagnostics, not confidence intervals. Quadratic refinement accepts irregular strictly increasing grids, flags boundaries, plateaus, and weak curvature, and emits JSON-safe `null` when unavailable.
 
 ## 4. End-to-end processing flow
 
@@ -177,7 +179,8 @@ Zernike coefficients + circular pupil
                  │ record_hologram
                  ▼
              intensity H
-                 │ optional additive Gaussian noise + clipping
+                 │ record real intensity H
+                 │ additive Gaussian noise relative to mean intensity + clipping
                  │ reconstruct_field
                  ▼
        baseband complex sensor field
@@ -196,33 +199,33 @@ Zernike coefficients + circular pupil
           recovered wavefront quality
 ```
 
-The current `demo.py` performs its own sweep loop for transparency. The reusable `focus_sweep` and `parabolic_peak` functions expose the same analysis for downstream applications.
+The demo and benchmark use the same intensity-noise helper. The reusable `focus_sweep` and `parabolic_peak` functions expose the same analysis for downstream applications.
 
 ## 5. Reproducible benchmark
 
 From the project root:
 
 ```sh
-python3 tests/tests.py
-python3 demo.py
-python3 -m compileall -q src tests demo.py
+python -m unittest discover -s tests -v
+python demo.py
+waveholo-benchmark --config smoke --output results/smoke
 ```
 
-The regression suite uses a `128 × 128` grid for speed and contains 14 tests covering pupil geometry, Zernike values, propagation round-trip and energy behavior, hologram properties, sideband fidelity, focus behavior, wavefront recovery, null control, input validation, and peak refinement.
+`worldholo-benchmark` is retained as a compatibility alias. The smoke profile
+is a software/engineering check against configured synthetic thresholds, not
+scientific acceptance. The scientific profile reports insufficient evidence
+until a genuinely frozen protocol and supporting evidence are available.
+Corrected output must be regenerated with the commands above; historical
+pre-correction benchmark numbers are not reused.
 
-The `256 × 256` demo reports the following synthetic benchmark values:
-
-| Test | Result |
-|---|---|
-| Focus estimate | `5.138 mm` for a true `5.000 mm` plane |
-| Focus peak shape | Flat-topped; approximately `±0.25 mm` sampled resolution |
-| Wavefront RMS at measured focus | `0.0066 waves` |
-| Circular phase agreement | `0.9991` |
-| Null-control RMS floor | `0.0057 waves` |
-| 5% mean-hologram noise RMS | `0.0070 waves` |
-| Phase-variance focus | `10.000 mm` sweep boundary; not a valid pupil focus metric |
-
-These are not uncertainty intervals and do not establish physical performance.
+The freshly regenerated `python demo.py` output on the original 256×256
+geometry gave a `5.138 mm` focus estimate (true `5.000 mm`), wrapped RMS
+`0.0066` waves at measured focus (`0.0064` at true focus), null-control RMS
+`0.0057` waves, and `0.0070` waves after 5% synthetic intensity noise. The
+phase-variance minimum was at the `10.000 mm` boundary, `+5.000 mm` from true
+focus, so the negative localization result was reproduced for that sweep.
+The smoke preset produced median RMS `0.011407` waves against a `0.010000`
+threshold with `0/3` successes; its claim gate correctly reported `fail`.
 
 ## 6. Input and data conventions
 
@@ -250,7 +253,16 @@ The focus result should be treated as low confidence when:
 - the camera is clipped or non-linear;
 - the null-control floor is comparable to the claimed signal.
 
-`parabolic_peak` is a local interpolation around an interior sampled maximum. It reports a half-step sampling diagnostic, not a statistical confidence interval.
+`parabolic_peak` fits an interior local quadratic, including for irregular
+strictly increasing grids, and reports boundary, plateau, weak-curvature,
+and half-step sampling diagnostics. These are not statistical confidence
+intervals; unavailable values serialize as JSON `null`.
+
+The power-analysis helper estimates equal per-group size for an independent,
+two-sided two-proportion comparison with pooled null variance and alternative
+variance. For `p_null=0.05`, `p_alternative=0.15`, `alpha=0.05`, and power
+`0.8`, its normal approximation returns 141 per group. It is an approximation,
+not observed benchmark evidence.
 
 ## 8. Physical laboratory transition
 
@@ -266,7 +278,12 @@ The complete bench-to-telescope sequence is in [`PHYSICAL_READINESS.md`](../PHYS
 8. Add real pupil obscurations, spiders, segmentation, vignetting, and atmosphere to the model before interpreting telescope data.
 9. Report raw-frame identifiers, calibration versions, sideband coordinates, focus curves, masks, saturation, repeatability, and uncertainty.
 
-The highest-impact engineering extensions are dark/flat correction, arbitrary-angle fractional-bin carrier estimation, apodized or model-based sideband filtering, camera noise likelihoods, pupil-registration estimation, and repeated-dataset uncertainty analysis.
+Physical camera/telescope validation, atmospheric turbulence, adaptive-optics
+integration, and independent acquisition baselines remain future work and are
+not asserted complete. Other engineering extensions include dark/flat
+correction, arbitrary-angle fractional-bin carrier estimation, apodized or
+model-based sideband filtering, physical camera noise likelihoods,
+pupil-registration estimation, and repeated-dataset uncertainty analysis.
 
 ## 9. Package structure
 
@@ -276,6 +293,7 @@ waveholo-telescope/
 │   ├── __init__.py       Public package exports and version
 │   ├── analysis.py       Focus sweeps and parabolic peak diagnostics
 │   ├── hologram.py       Recording and sideband reconstruction
+│   ├── benchmark.py      Synthetic benchmark engine and CLI
 │   ├── metrics.py        Focus and phase metrics
 │   ├── propagation.py    Angular-spectrum propagation
 │   └── pupil.py          Grid, circular pupil, and Zernike phase model

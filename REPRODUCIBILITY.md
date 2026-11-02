@@ -20,12 +20,16 @@ From a clean clone:
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-python -m pip install -e .
-pytest
+python -m pip install .
+python -m unittest discover -s tests -v
 python demo.py
+waveholo-benchmark --config smoke --output results/smoke
 ```
 
-If the project later adds a dedicated benchmark entry point, replace `python demo.py` with that command and retain the original command as a compatibility fallback.
+`worldholo-benchmark` remains a compatibility alias. The packaged `smoke`
+and `primary` presets are available from installed wheels. CI also builds
+and installs a wheel in an isolated environment, runs outside the checkout,
+and invokes the installed CLI.
 
 ## Benchmark parameters
 
@@ -36,6 +40,18 @@ The documented 256 by 256 synthetic benchmark uses:
 - Carrier frequency: 80 bins.
 - Sideband half-width: 48 bins.
 - Pupil-to-sensor distance: 5.00 mm.
+- Documented lower-resolution numerical presets: `128:(40, 24)` and
+  `64:(20, 12)`, preserving the same pitch, wavelength, and distance.
+- Unknown grid sizes require explicit carrier and window settings. Fourier
+  crop fit is not a physical sideband-separation test.
+
+## Acceptance profiles
+
+The smoke profile is an engineering check against configured synthetic
+thresholds, not scientific acceptance. The scientific profile reports
+insufficient evidence until a genuinely frozen protocol and supporting
+evidence exist. These criteria are not described as preregistered, and
+`physical_claim` remains false regardless of synthetic results.
 
 ## Required release artifacts
 
@@ -47,6 +63,8 @@ For each tagged release, retain:
 - Benchmark metrics in machine-readable form.
 - Generated figures, where applicable.
 - Exact commit SHA and tag name.
+- Corrected `raw_results.json`, analysis, claims, report, and checksums from a
+  fresh run; do not reuse pre-correction benchmark outputs.
 
 ## Change control
 

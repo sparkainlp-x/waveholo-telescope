@@ -13,6 +13,7 @@ import hashlib
 import importlib.metadata
 import importlib.resources
 import json
+import os
 import platform
 import sys
 from datetime import datetime, timezone
@@ -28,7 +29,7 @@ from .propagation import DX, WL, angular_spectrum
 from .pupil import pupil_field, pupil_grid
 from .statistics import bootstrap_median_interval, median_and_iqr, wilson_interval
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
 GRID_PRESETS = {256: (80, 48), 128: (40, 24), 64: (20, 12)}
 ARTIFACT_NAMES = (
     "manifest.json", "raw_results.json", "analysis.json", "claims.json",
@@ -58,10 +59,7 @@ def _add_sensor_noise(hologram, sigma_relative, rng):
     if np.iscomplexobj(hologram):
         raise ValueError("sensor noise must be applied to real intensity data")
     hologram = np.asarray(hologram, dtype=float)
-    try:
-        sigma_relative = float(sigma_relative)
-    except (TypeError, ValueError):
-        raise ValueError("sigma_relative must be finite and non-negative") from None
+    sigma_relative = _finite_number(sigma_relative, "sigma_relative")
     if (hologram.ndim != 2 or not np.isfinite(hologram).all()
             or (hologram < 0).any()):
         raise ValueError("hologram must be finite, non-negative 2D intensity data")
@@ -71,6 +69,18 @@ def _add_sensor_noise(hologram, sigma_relative, rng):
         return hologram.copy()
     noisy = hologram + rng.normal(0.0, sigma_relative * hologram.mean(), hologram.shape)
     return np.clip(noisy, 0.0, None)
+
+
+def _finite_number(value, name):
+    if isinstance(value, (bool, np.bool_)):
+        raise ValueError(f"{name} must be finite")
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"{name} must be finite") from None
+    if not np.isfinite(number):
+        raise ValueError(f"{name} must be finite")
+    return number
 
 
 def _integer(value, name, minimum):
@@ -110,11 +120,11 @@ def run_condition(*, seed, n=128, radius=32, true_distance_m=5.0e-3,
                   sweep_half_range_m=1.0e-3, sweep_points=21,
                   aberration_scale=1.0):
     n = _integer(n, "n", 64)
-    radius = _integer(radius, "radius", 1)
+    radius = _integer(radius, "radius", 2)
     seed = _integer(seed, "seed", 0)
     sweep_points = _integer(sweep_points, "sweep_points", 3)
     if radius >= n // 2:
-        raise ValueError("require n >= 64 and 0 < radius < n/2")
+        raise ValueError("require n >= 64 and 2 <= radius < n/2")
     carrier, window, settings_source = _resolved_sideband_settings(n, carrier, window)
     numeric = {
         "true_distance_m": true_distance_m,
@@ -123,12 +133,7 @@ def run_condition(*, seed, n=128, radius=32, true_distance_m=5.0e-3,
         "aberration_scale": aberration_scale,
     }
     for name, value in numeric.items():
-        try:
-            numeric[name] = float(value)
-        except (TypeError, ValueError):
-            raise ValueError(f"{name} must be finite") from None
-        if not np.isfinite(numeric[name]):
-            raise ValueError(f"{name} must be finite")
+        numeric[name] = _finite_number(value, name)
     true_distance_m = numeric["true_distance_m"]
     sweep_half_range_m = numeric["sweep_half_range_m"]
     noise_sigma = numeric["noise_sigma"]
@@ -137,6 +142,8 @@ def run_condition(*, seed, n=128, radius=32, true_distance_m=5.0e-3,
         raise ValueError("distance and noise settings must be non-negative; sweep range must be positive")
     if aberration_scale < 0:
         raise ValueError("aberration_scale must be non-negative")
+    if not np.isfinite(true_distance_m + sweep_half_range_m):
+        raise ValueError("sweep upper bound must be finite")
     rng = np.random.default_rng(seed)
 
     pupil, mask, true_phase = pupil_field(
@@ -191,6 +198,7 @@ def run_condition(*, seed, n=128, radius=32, true_distance_m=5.0e-3,
         "sideband_settings_source": settings_source,
         "fourier_crop_fits_array": True,
         "sideband_separation_verified": False,
+        "sideband_separation_note": "array fit does not verify optical spectral separation",
         "true_distance_m": true_distance_m,
         "focus": focus,
         "focus_error_m": float(measured_distance - true_distance_m),
@@ -198,6 +206,7 @@ def run_condition(*, seed, n=128, radius=32, true_distance_m=5.0e-3,
         "phase_rms_true_focus_waves": rms_true,
         "phase_agreement": agreement,
         "aperture_contrast_at_sampled_peak": focus["score"],
+        "sweep_distances_m": [float(value) for value in sweep_distances],
         "phase_variance_sweep": [float(value) for value in variances],
         "phase_variance_minimum": {
             "distance_m": variance_distance,
@@ -217,7 +226,7 @@ def run_benchmark(config):
     if missing:
         raise ValueError(f"benchmark config missing keys: {sorted(missing)}")
     n = _integer(config["grid"], "grid", 64)
-    radius = _integer(config["pupil_radius_px"], "pupil_radius_px", 1)
+    radius = _integer(config["pupil_radius_px"], "pupil_radius_px", 2)
     carrier, window, settings_source = _resolved_sideband_settings(
         n, config.get("carrier_bins"), config.get("sideband_half_width_bins")
     )
@@ -226,23 +235,27 @@ def run_benchmark(config):
     if not isinstance(config["seeds"], list) or not isinstance(config["noise_levels"], list):
         raise ValueError("seeds and noise_levels must be arrays")
     seeds = [_integer(seed, "seed", 0) for seed in config["seeds"]]
-    try:
-        noise_levels = [float(value) for value in config["noise_levels"]]
-    except (TypeError, ValueError):
-        raise ValueError("noise_levels must be finite non-negative numbers") from None
+    noise_levels = [
+        _finite_number(value, "noise level") for value in config["noise_levels"]
+    ]
     if (not seeds or not noise_levels
             or any(not np.isfinite(value) or value < 0 for value in noise_levels)):
         raise ValueError("seeds and noise_levels must be non-empty; noise must be non-negative")
     sweep_points = _integer(config.get("sweep_points", 21), "sweep_points", 3)
     n_bootstrap = _integer(config.get("n_bootstrap", 2000), "n_bootstrap", 100)
-    try:
-        true_distance = float(config["true_distance_m"])
-        sweep_half_range = float(config.get("sweep_half_range_m", 1e-3))
-        aberration_scale = float(config.get("aberration_scale", 1.0))
-        threshold = float(config.get("primary_rms_threshold", 0.01))
-        min_success_fraction = float(config.get("min_success_fraction", 0.9))
-    except (TypeError, ValueError):
-        raise ValueError("numeric benchmark settings must be finite numbers") from None
+    true_distance = _finite_number(config["true_distance_m"], "true_distance_m")
+    sweep_half_range = _finite_number(
+        config.get("sweep_half_range_m", 1e-3), "sweep_half_range_m"
+    )
+    aberration_scale = _finite_number(
+        config.get("aberration_scale", 1.0), "aberration_scale"
+    )
+    threshold = _finite_number(
+        config.get("primary_rms_threshold", 0.01), "primary_rms_threshold"
+    )
+    min_success_fraction = _finite_number(
+        config.get("min_success_fraction", 0.9), "min_success_fraction"
+    )
     for key, value in {
         "true_distance_m": true_distance,
         "sweep_half_range_m": sweep_half_range,
@@ -257,7 +270,9 @@ def run_benchmark(config):
     if threshold < 0 or not 0 <= min_success_fraction <= 1:
         raise ValueError("claim thresholds are out of range")
     acceptance_profile = config.get("acceptance_profile", "smoke")
-    if acceptance_profile not in {"smoke", "scientific"}:
+    if not isinstance(acceptance_profile, str) or acceptance_profile not in {
+        "smoke", "scientific"
+    }:
         raise ValueError("acceptance_profile must be 'smoke' or 'scientific'")
     resolved_config = dict(config)
     resolved_config.update({
@@ -276,6 +291,14 @@ def run_benchmark(config):
         "min_success_fraction": min_success_fraction,
         "n_bootstrap": n_bootstrap,
         "acceptance_profile": acceptance_profile,
+        "pixel_pitch_m": DX,
+        "wavelength_m": WL,
+        "aberrations_waves": {
+            "defocus": 0.4 * aberration_scale,
+            "astig_x": 0.3 * aberration_scale,
+            "coma_x": 0.2 * aberration_scale,
+        },
+        "noise_model": "additive Gaussian intensity noise; standard deviation is relative to mean intensity; clipped at zero",
     })
 
     raw = []
@@ -335,6 +358,11 @@ def run_benchmark(config):
             ),
             "success_fraction": wilson_interval(successes, len(rms_values)),
             "threshold": threshold,
+            "min_success_fraction_threshold": min_success_fraction,
+            "metric_definition": (
+                "wrapped phase RMS in waves after separate piston removal "
+                "from recovered and injected phase"
+            ),
         },
         "null_control": {
             "phase_rms": null["phase_rms_true_focus_waves"],
@@ -347,7 +375,7 @@ def run_benchmark(config):
             ])
             for noise in noise_levels
         },
-        "phase_variance_negative_control": {
+        "phase_variance_focus_assessment": {
             "decision": variance_decision,
             "localized_trials": int(sum(variance_localized)),
             "trials": len(variance_localized),
@@ -370,7 +398,8 @@ def _load_config(spec):
     candidate = Path(spec)
     if candidate.is_file():
         content = candidate.read_bytes()
-        return json.loads(content), content, str(candidate.resolve())
+        origin = candidate.name if candidate.is_absolute() else str(candidate)
+        return json.loads(content), content, origin
     preset = Path(spec).stem.removeprefix("v0.2.0-")
     if preset not in {"smoke", "primary"}:
         raise FileNotFoundError(f"configuration not found: {spec}")
@@ -411,6 +440,7 @@ def main(argv=None):
         "platform": platform.platform(),
         "numpy_version": np.__version__,
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "git_commit_sha": os.environ.get("GITHUB_SHA"),
         "config_origin": config_origin,
         "config": resolved_config,
         "config_sha256": hashlib.sha256(config_bytes).hexdigest(),
@@ -421,6 +451,7 @@ def main(argv=None):
             "sideband_half_width_bins": resolved_config["sideband_half_width_bins"],
             "fourier_crop_fits_array": True,
             "sideband_separation_verified": False,
+            "sideband_separation_note": "array fit does not verify optical spectral separation",
         },
         "source_hashes": _source_hashes(),
     }
@@ -437,16 +468,16 @@ def main(argv=None):
         "",
         "## Primary result",
         "",
-        f"- Median phase RMS at measured focus: {analysis['primary']['phase_rms_median']:.6f} waves",
+        f"- Median wrapped phase RMS at measured focus: {analysis['primary']['phase_rms_median']:.6f} waves",
         f"- Acceptance threshold: {analysis['primary']['threshold']:.6f} waves",
         f"- Success fraction: {analysis['primary']['success_fraction']['estimate']:.3f}",
         "",
-        "## Negative control",
+        "## Controls and focus diagnostics",
         "",
         f"- Null-control phase RMS at true focus: {analysis['null_control']['phase_rms']:.6f} waves",
-        f"- Measured phase-variance focus decision: {analysis['phase_variance_negative_control']['decision']} "
-        f"({analysis['phase_variance_negative_control']['localized_trials']}/"
-        f"{analysis['phase_variance_negative_control']['trials']} primary trials localized).",
+        f"- Measured phase-variance focus decision: {analysis['phase_variance_focus_assessment']['decision']} "
+        f"({analysis['phase_variance_focus_assessment']['localized_trials']}/"
+        f"{analysis['phase_variance_focus_assessment']['trials']} primary trials localized).",
         "",
         "## Scope",
         "",

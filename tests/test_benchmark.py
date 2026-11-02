@@ -1,6 +1,7 @@
 # Copyright (C) 2026 Jean-François Brisson
 # SPDX-License-Identifier: AGPL-3.0-only
 import json
+import importlib.metadata
 import tempfile
 import unittest
 from pathlib import Path
@@ -8,7 +9,8 @@ from pathlib import Path
 import numpy as np
 
 from waveholo_telescope.benchmark import (
-    _add_sensor_noise, main, run_condition,
+    _add_sensor_noise, _resolved_sideband_settings, main, run_benchmark,
+    run_condition,
 )
 from waveholo_telescope.hologram import record_hologram, reconstruct_field
 from waveholo_telescope.propagation import angular_spectrum
@@ -23,7 +25,15 @@ class TestBenchmark(unittest.TestCase):
         self.assertEqual(first["carrier_bins"], 20)
         self.assertEqual(first["sideband_half_width_bins"], 12)
         self.assertEqual(len(first["phase_variance_sweep"]), 5)
+        self.assertEqual(len(first["sweep_distances_m"]), 5)
         self.assertIn("at_boundary", first["phase_variance_minimum"])
+
+    def test_original_optical_preset_is_preserved(self):
+        primary = json.loads(Path("configs/v0.2.0-primary.json").read_text())
+        self.assertEqual((primary["grid"], primary["carrier_bins"],
+                          primary["sideband_half_width_bins"]), (256, 80, 48))
+        self.assertEqual(_resolved_sideband_settings(256, None, None),
+                         (80, 48, "documented_grid_preset"))
 
     def test_sensor_noise_is_deterministic_and_preserves_zero_noise(self):
         intensity = np.arange(16, dtype=float).reshape(4, 4)
@@ -77,6 +87,20 @@ class TestBenchmark(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     run_condition(seed=1, n=96, radius=24, sweep_points=3, **kwargs)
 
+    def test_integer_settings_are_not_silently_truncated(self):
+        for kwargs in (
+            {"n": 64.5},
+            {"radius": 16.5},
+            {"sweep_points": 3.5},
+        ):
+            with self.subTest(kwargs=kwargs):
+                with self.assertRaises(ValueError):
+                    run_condition(seed=1, **kwargs)
+        config = json.loads(Path("configs/v0.2.0-smoke.json").read_text())
+        config["grid"] = 128.5
+        with self.assertRaises(ValueError):
+            run_benchmark(config)
+
     def test_smoke_benchmark_writes_complete_artifacts(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "results"
@@ -88,15 +112,21 @@ class TestBenchmark(unittest.TestCase):
                 self.assertTrue((output / name).exists(), name)
             claims = json.loads((output / "claims.json").read_text())
             manifest = json.loads((output / "manifest.json").read_text())
+            analysis = json.loads((output / "analysis.json").read_text())
             self.assertEqual(claims["scope"], "synthetic_simulation_only")
             self.assertFalse(claims["physical_claim"])
             self.assertTrue(manifest["source_hashes"])
+            self.assertEqual(manifest["schema_version"], "1.1")
+            self.assertEqual(analysis["schema_version"], "1.1")
+            self.assertEqual(
+                manifest["package_version"],
+                importlib.metadata.version("waveholo-telescope"),
+            )
             self.assertTrue(manifest["config"]["carrier_bins"] == 40)
             self.assertTrue((output / "obsolete.txt").exists())
-            json.loads(
-                (output / "raw_results.json").read_text(),
-                parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)),
-            )
+            reject_non_json = lambda value: (_ for _ in ()).throw(ValueError(value))
+            for name in ("manifest.json", "raw_results.json", "analysis.json", "claims.json"):
+                json.loads((output / name).read_text(), parse_constant=reject_non_json)
 
 if __name__ == "__main__":
     unittest.main()

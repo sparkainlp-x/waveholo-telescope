@@ -13,6 +13,8 @@ SCOPE = "synthetic_simulation_only"
 
 
 def _finite(value):
+    if isinstance(value, bool):
+        return False
     try:
         number = float(value)
     except (TypeError, ValueError):
@@ -34,7 +36,9 @@ def default_rules(primary_rms_threshold=0.01, min_success_fraction=0.9,
     primary_rms_threshold, min_success_fraction = _thresholds(
         primary_rms_threshold, min_success_fraction
     )
-    if acceptance_profile not in {"smoke", "scientific"}:
+    if not isinstance(acceptance_profile, str) or acceptance_profile not in {
+        "smoke", "scientific"
+    }:
         raise ValueError("acceptance_profile must be 'smoke' or 'scientific'")
 
     def primary_rms(results):
