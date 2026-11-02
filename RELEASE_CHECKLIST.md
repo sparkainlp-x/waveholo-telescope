@@ -28,13 +28,20 @@ Use this checklist before publishing any tagged release.
 ## Versioning
 
 - [ ] Version number is updated in project metadata.
+- [ ] `pyproject.toml`, `__version__`, and `CITATION.cff` agree with the release tag.
+- [ ] The corrected smoke benchmark has been regenerated; outputs from before the intensity-noise correction are not reused.
 - [ ] `CHANGELOG.md` contains a dated entry for the release.
 - [ ] The release tag points to the intended commit on the default branch.
 - [ ] The release is marked Latest unless it is explicitly historical.
 
 ## Publication
 
+- The release workflow publishes to PyPI automatically for version tags; a
+  manual workflow dispatch publishes only when `publish` is explicitly set
+  to `true`. GitHub Releases are created for tags, not ordinary dispatches.
 - [ ] Release title uses the format: `WaveHolo Telescope vX.Y.Z`.
 - [ ] Release notes include Added, Changed, Fixed, Validation, and Limitations sections where applicable.
 - [ ] Source archive and any built wheel are attached or linked.
+- [ ] Generated benchmark artifacts and checksums are attached to the GitHub release.
+- [ ] The tag-triggered PyPI publication and opt-in manual publication behavior is understood and authorized.
 - [ ] The release URL is recorded in project outreach materials only after publication.

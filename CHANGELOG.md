@@ -2,6 +2,24 @@
 
 ## Unreleased scientific-readiness pass
 
+- Corrected benchmark sensor noise to modify the real recorded intensity
+  before sideband reconstruction, and regenerated evidence is required.
+- Added validated grid presets and explicit unknown-grid carrier/window
+  settings while retaining the original 256x256 geometry.
+- Recorded full phase-variance sweeps and measured localization decisions;
+  made smoke and scientific claim profiles distinct and removed
+  preregistration language.
+- Hardened focus/statistical inputs, JSON serialization, installed-source
+  provenance and bounded transfer-function caching.
+- Corrected the two-proportion power approximation to its documented
+  equal-group, two-sided independent-sample design and added a reference
+  sample-size check.
+- Bumped the benchmark artifact/config schema to 1.1 for measured
+  phase-variance assessment fields.
+- Added packaged CLI presets, the `waveholo-benchmark` command, and isolated
+  wheel-install CI while retaining `worldholo-benchmark`.
+- Updated version metadata and documented physical validation, turbulence,
+  adaptive optics and independent acquisition as future work.
 - Added explicit validation for square fields, finite holograms, physical
   propagation parameters, integer carrier/window settings, and sideband fit.
 - Added reusable `focus_sweep` and `parabolic_peak` helpers. The latter
@@ -11,6 +29,10 @@
   protocol in `PHYSICAL_READINESS.md`.
 
 ## v0.1.0 (2026-10-31)
+
+> Historical measurements below predate the audited intensity-noise correction
+> and are not current benchmark evidence. Regenerate results with the current
+> version before citing quantitative performance.
 
 - Standalone telescope adaptation of WaveHolo's off-axis digital
   holography pipeline: circular pupil (radius 64 px) with Zernike

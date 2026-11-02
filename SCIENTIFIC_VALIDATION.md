@@ -16,6 +16,11 @@ The project may claim only that its pipeline can, under the documented synthetic
 - Report phase-quality diagnostics, including circular phase agreement, piston-removed wrapped-phase RMS, and secondary phase variance.
 - Regenerate the documented benchmark and pass the regression suite.
 
+Passing the smoke profile is an engineering acceptance check against
+configured synthetic thresholds, not scientific acceptance. The scientific
+profile remains insufficient until a genuinely frozen protocol and supporting
+evidence exist; the criteria are not described as preregistered.
+
 ## Primary metrics
 
 | Metric | Purpose | Required reporting |
@@ -52,7 +57,8 @@ Do not claim that this software demonstrates:
 
 - Telescope, astronomical, or observational performance.
 - Laboratory optical validation.
-- Camera calibration, dark/flat correction, or sensor-noise modeling.
+- Camera calibration, dark/flat correction, or a physical camera-noise model.
+  Additive Gaussian intensity noise in the benchmark is synthetic only.
 - Atmospheric-turbulence compensation.
 - Holographic display performance.
 - Quantum-computing or quantum-error-correction performance.
@@ -61,3 +67,11 @@ Do not claim that this software demonstrates:
 ## Release interpretation
 
 Synthetic benchmark results establish algorithm behavior under controlled assumptions. They do not establish performance on physical hardware or real astronomical data.
+
+## Future work (not completed)
+
+Physical camera and telescope validation, atmospheric turbulence,
+adaptive-optics integration, and independent acquisition baselines are outside
+the current scope. They require separate experimental protocols, data
+provenance, and acceptance criteria; no completion or physical validation is
+implied here.

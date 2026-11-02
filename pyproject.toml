@@ -16,7 +16,7 @@ keywords = ["holography", "optics", "wavefront", "telescope", "simulation"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Science/Research",
-  "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+  "License :: OSI Approved :: GNU Affero General Public License v3",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.10",
@@ -33,7 +33,11 @@ Changelog = "https://github.com/sparkainlp-x/waveholo-telescope/blob/main/CHANGE
 Issues = "https://github.com/sparkainlp-x/waveholo-telescope/issues"
 
 [project.scripts]
+waveholo-benchmark = "waveholo_telescope.benchmark:main"
 worldholo-benchmark = "waveholo_telescope.benchmark:main"
+
+[tool.setuptools.package-data]
+waveholo_telescope = ["configs/*.json"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

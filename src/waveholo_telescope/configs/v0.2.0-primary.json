@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.1",
+  "acceptance_profile": "scientific",
+  "seeds": [101, 202, 303, 404, 505, 606, 707, 808, 909, 1010, 1111, 1212, 1313, 1414, 1515, 1616, 1717, 1818, 1919, 2020, 2121, 2222, 2323, 2424, 2525, 2626, 2727, 2828, 2929, 3030],
+  "noise_levels": [0.0, 0.01, 0.02, 0.05, 0.1, 0.2],
+  "grid": 256,
+  "pupil_radius_px": 64,
+  "true_distance_m": 0.005,
+  "carrier_bins": 80,
+  "sideband_half_width_bins": 48,
+  "sweep_half_range_m": 0.001,
+  "sweep_points": 21,
+  "aberration_scale": 1.0,
+  "primary_rms_threshold": 0.01,
+  "min_success_fraction": 0.9,
+  "n_bootstrap": 10000
+}

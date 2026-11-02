@@ -1,5 +1,8 @@
 name: CI
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
@@ -49,10 +52,11 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e .
       - name: Run smoke benchmark
-        run: worldholo-benchmark --config configs/v0.2.0-smoke.json --output results/smoke
+        run: waveholo-benchmark --config smoke --output results/smoke
       - name: Validate artifacts
         run: |
           test -f results/smoke/manifest.json
+          test -f results/smoke/raw_results.json
           test -f results/smoke/analysis.json
           test -f results/smoke/claims.json
           test -f results/smoke/report.md
@@ -67,7 +71,7 @@ jobs:
           claims = json.loads(Path('results/smoke/claims.json').read_text())
           if claims.get('scope') != 'synthetic_simulation_only':
               raise SystemExit('Claim scope must be synthetic_simulation_only')
-          if claims.get('claim_gate_status') not in {'pass', 'fail', 'inconclusive'}:
+          if claims.get('claim_gate_status') not in {'pass', 'fail', 'insufficient_evidence'}:
               raise SystemExit('Invalid claim gate status')
           forbidden = ['telescope-ready', 'works on telescopes', 'validates physical holography', 'ready for observatory deployment']
           text = json.dumps(claims).lower()
@@ -97,8 +101,8 @@ jobs:
           python -m pip install -e .
       - name: Run benchmark twice
         run: |
-          worldholo-benchmark --config configs/v0.2.0-smoke.json --output results/run-a
-          worldholo-benchmark --config configs/v0.2.0-smoke.json --output results/run-b
+          waveholo-benchmark --config smoke --output results/run-a
+          waveholo-benchmark --config smoke --output results/run-b
       - name: Compare deterministic outputs
         run: |
           python - <<'PY'
@@ -106,7 +110,7 @@ jobs:
           from pathlib import Path
           def digest(path):
               return hashlib.sha256(path.read_bytes()).hexdigest()
-          for name in ('analysis.json', 'claims.json', 'report.md'):
+          for name in ('raw_results.json', 'analysis.json', 'claims.json', 'report.md'):
               a = Path('results/run-a') / name
               b = Path('results/run-b') / name
               if not a.exists() or not b.exists():
@@ -122,3 +126,50 @@ jobs:
             results/run-a
             results/run-b
           if-no-files-found: error
+
+  wheel-install:
+    name: Installed wheel CLI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Build and install wheel outside checkout
+        run: |
+          python -m pip wheel --no-deps . --wheel-dir dist
+          python -m venv /tmp/waveholo-wheel-env
+          /tmp/waveholo-wheel-env/bin/python -m pip install dist/*.whl
+          cd /tmp
+          /tmp/waveholo-wheel-env/bin/python - <<'PY'
+          import os
+          import pathlib
+          import waveholo_telescope
+          module_path = pathlib.Path(waveholo_telescope.__file__).resolve()
+          if pathlib.Path(os.environ['GITHUB_WORKSPACE']).resolve() in module_path.parents:
+              raise SystemExit(f'Package imported from checkout: {module_path}')
+          print('Installed package:', module_path)
+          PY
+          /tmp/waveholo-wheel-env/bin/waveholo-benchmark --config smoke --output /tmp/waveholo-wheel-results
+          /tmp/waveholo-wheel-env/bin/worldholo-benchmark --help >/dev/null
+          test -f /tmp/waveholo-wheel-results/raw_results.json
+          test -f /tmp/waveholo-wheel-results/claims.json
+          /tmp/waveholo-wheel-env/bin/python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          import waveholo_telescope
+          manifest = json.loads(Path('/tmp/waveholo-wheel-results/manifest.json').read_text())
+          package_dir = Path(waveholo_telescope.__file__).resolve().parent
+          hashes = manifest['source_hashes']
+          if not hashes:
+              raise SystemExit('Installed source hashes are empty')
+          for name, expected in hashes.items():
+              installed_module = package_dir / Path(name).name
+              actual = hashlib.sha256(installed_module.read_bytes()).hexdigest()
+              if actual != expected:
+                  raise SystemExit(f'Source hash mismatch: {installed_module}')
+          PY
+          cd /tmp/waveholo-wheel-results
+          sha256sum --check checksums.sha256

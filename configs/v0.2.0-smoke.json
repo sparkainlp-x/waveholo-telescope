@@ -1,5 +1,6 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
+  "acceptance_profile": "smoke",
   "seeds": [11, 22, 33],
   "noise_levels": [0.0, 0.05],
   "grid": 128,
@@ -11,5 +12,6 @@
   "sweep_points": 11,
   "aberration_scale": 1.0,
   "primary_rms_threshold": 0.01,
+  "min_success_fraction": 0.9,
   "n_bootstrap": 1000
 }

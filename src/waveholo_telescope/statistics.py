@@ -14,10 +14,34 @@ import numpy as np
 
 
 def _values(values):
-    array = np.asarray(list(values), dtype=float)
-    if array.size == 0 or not np.isfinite(array).all():
-        raise ValueError("values must be a non-empty finite numeric sequence")
+    try:
+        array = np.asarray(values, dtype=float)
+        if array.ndim == 0 and not np.isscalar(values):
+            array = np.asarray(list(values), dtype=float)
+    except (TypeError, ValueError):
+        array = np.asarray(list(values), dtype=float)
+    if array.ndim != 1 or array.size == 0 or not np.isfinite(array).all():
+        raise ValueError("values must be a non-empty, one-dimensional finite numeric sequence")
     return array
+
+
+def _probability(value, name, *, inclusive_zero=True):
+    try:
+        result = float(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"{name} must be finite and in (0, 1)") from None
+    lower_ok = result >= 0 if inclusive_zero else result > 0
+    if not np.isfinite(result) or not lower_ok or result >= 1:
+        raise ValueError(f"{name} must be finite and in (0, 1)")
+    return result
+
+
+def _count(value, name, minimum):
+    if isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, np.integer)):
+        raise ValueError(f"{name} must be an integer")
+    if value < minimum:
+        raise ValueError(f"{name} must be at least {minimum}")
+    return int(value)
 
 
 def median_and_iqr(values):
@@ -35,10 +59,8 @@ def median_and_iqr(values):
 
 
 def bootstrap_median_interval(values, *, n_bootstrap=10000, alpha=0.05, seed=0):
-    if n_bootstrap < 100:
-        raise ValueError("n_bootstrap must be at least 100")
-    if not 0 < alpha < 1:
-        raise ValueError("alpha must be between 0 and 1")
+    n_bootstrap = _count(n_bootstrap, "n_bootstrap", 100)
+    alpha = _probability(alpha, "alpha", inclusive_zero=False)
     array = _values(values)
     rng = np.random.default_rng(seed)
     indices = rng.integers(0, array.size, size=(n_bootstrap, array.size))
@@ -56,21 +78,20 @@ def bootstrap_median_interval(values, *, n_bootstrap=10000, alpha=0.05, seed=0):
 
 
 def wilson_interval(successes, n, alpha=0.05):
-    successes = int(successes)
-    n = int(n)
-    if n <= 0 or successes < 0 or successes > n:
+    successes = _count(successes, "successes", 0)
+    n = _count(n, "n", 1)
+    if successes > n:
         raise ValueError("require 0 <= successes <= n and n > 0")
-    if not 0 < alpha < 1:
-        raise ValueError("alpha must be between 0 and 1")
-    z = float(np.sqrt(2) * _erfinv(1 - alpha))
+    alpha = _probability(alpha, "alpha", inclusive_zero=False)
+    z = _normal_upper_quantile(alpha / 2)
     p = successes / n
     denominator = 1 + z**2 / n
     centre = (p + z**2 / (2 * n)) / denominator
     half = z * math.sqrt(p * (1 - p) / n + z**2 / (4 * n**2)) / denominator
     return {
         "estimate": p,
-        "lower": max(0.0, centre - half),
-        "upper": min(1.0, centre + half),
+        "lower": 0.0 if successes == 0 else max(0.0, centre - half),
+        "upper": 1.0 if successes == n else min(1.0, centre + half),
         "level": 1 - alpha,
         "successes": successes,
         "n": n,
@@ -78,13 +99,15 @@ def wilson_interval(successes, n, alpha=0.05):
     }
 
 
-def _erfinv(y):
-    if not 0 <= y <= 1:
-        raise ValueError("erfinv argument must be in [0, 1]")
-    low, high = -6.0, 6.0
+def _normal_upper_quantile(tail_probability):
+    if not np.isfinite(tail_probability) or not 0 < tail_probability < 0.5:
+        raise ValueError("tail_probability must be finite and in (0, 0.5)")
+    low, high = 0.0, 8.0
+    while 0.5 * math.erfc(high / math.sqrt(2)) > tail_probability:
+        high *= 2
     for _ in range(100):
         mid = (low + high) / 2
-        if math.erf(mid) < y:
+        if 0.5 * math.erfc(mid / math.sqrt(2)) > tail_probability:
             low = mid
         else:
             high = mid
@@ -92,11 +115,18 @@ def _erfinv(y):
 
 
 def paired_bootstrap_difference(pairs, *, n_bootstrap=10000, alpha=0.05, seed=0):
-    array = np.asarray(list(pairs), dtype=float)
+    try:
+        pair_values = pairs if isinstance(pairs, np.ndarray) else list(pairs)
+        array = np.asarray(pair_values, dtype=float)
+    except (TypeError, ValueError):
+        raise ValueError("pairs must be a non-empty (n, 2) array") from None
     if array.ndim != 2 or array.shape[1] != 2 or array.size == 0:
         raise ValueError("pairs must be a non-empty (n, 2) array")
     if not np.isfinite(array).all():
         raise ValueError("pairs must be finite")
+    n_bootstrap = _count(n_bootstrap, "n_bootstrap", 100)
+    alpha = _probability(alpha, "alpha", inclusive_zero=False)
+    # Each paired difference is first column minus second column.
     differences = array[:, 0] - array[:, 1]
     rng = np.random.default_rng(seed)
     indices = rng.integers(0, differences.size, size=(n_bootstrap, differences.size))
@@ -115,10 +145,14 @@ def paired_bootstrap_difference(pairs, *, n_bootstrap=10000, alpha=0.05, seed=0)
 
 
 def benjamini_hochberg(p_values, q=0.05):
-    p = np.asarray(list(p_values), dtype=float)
-    if p.size == 0 or not np.isfinite(p).all() or ((p < 0) | (p > 1)).any():
+    p = _values(p_values)
+    if ((p < 0) | (p > 1)).any():
         raise ValueError("p_values must be finite and within [0, 1]")
-    if not 0 < q <= 1:
+    try:
+        q = float(q)
+    except (TypeError, ValueError):
+        raise ValueError("q must be finite and in (0, 1]") from None
+    if not np.isfinite(q) or not 0 < q <= 1:
         raise ValueError("q must be in (0, 1]")
     order = np.argsort(p)
     ranked = p[order]
@@ -131,15 +165,36 @@ def benjamini_hochberg(p_values, q=0.05):
 
 
 def power_analysis_proportion(p_null, p_alternative, alpha=0.05, power=0.8):
-    for value in (p_null, p_alternative):
-        if not 0 <= value <= 1:
-            raise ValueError("proportions must be within [0, 1]")
+    """Approximate equal group size for a two-sided independent proportion test.
+
+    Uses the pooled proportion under the null and the two-group variance under
+    the alternative in a normal approximation.
+    """
+    if isinstance(p_null, (bool, np.bool_)) or isinstance(
+            p_alternative, (bool, np.bool_)):
+        raise ValueError("proportions must be finite and within [0, 1]")
+    try:
+        p_null, p_alternative = float(p_null), float(p_alternative)
+    except (TypeError, ValueError):
+        raise ValueError("proportions must be finite and within [0, 1]") from None
+    if (not np.isfinite(p_null) or not np.isfinite(p_alternative)
+            or not 0 <= p_null <= 1 or not 0 <= p_alternative <= 1):
+        raise ValueError("proportions must be finite and within [0, 1]")
+    alpha = _probability(alpha, "alpha", inclusive_zero=False)
+    power = _probability(power, "power", inclusive_zero=False)
+    if power <= 0.5:
+        raise ValueError("power must be greater than 0.5")
     if p_null == p_alternative:
         return {"achievable": False, "reason": "null and alternative proportions are equal"}
-    z_alpha = float(np.sqrt(2) * _erfinv(1 - alpha))
-    z_power = float(np.sqrt(2) * _erfinv(power))
+    z_alpha = _normal_upper_quantile(alpha / 2)
+    z_power = _normal_upper_quantile(1 - power)
     delta = abs(p_alternative - p_null)
-    n = ((z_alpha * math.sqrt(p_null * (1 - p_null)) + z_power * math.sqrt(p_alternative * (1 - p_alternative))) / delta) ** 2
+    pooled_null = (p_null + p_alternative) / 2
+    null_sd = math.sqrt(2 * pooled_null * (1 - pooled_null))
+    alternative_sd = math.sqrt(
+        p_null * (1 - p_null) + p_alternative * (1 - p_alternative)
+    )
+    n = ((z_alpha * null_sd + z_power * alternative_sd) / delta) ** 2
     return {
         "achievable": True,
         "p_null": p_null,
@@ -147,20 +202,30 @@ def power_analysis_proportion(p_null, p_alternative, alpha=0.05, power=0.8):
         "alpha": alpha,
         "target_power": power,
         "required_n_per_group": int(math.ceil(n)),
-        "approximation": "normal_approximation_two_proportion",
+        "approximation": "two_sided_normal_approximation_independent_proportions_equal_group_pooled_null",
     }
 
 
 def claim_gate(results, decision_rules):
     if not isinstance(results, dict) or not isinstance(decision_rules, dict):
         raise ValueError("results and decision_rules must be dictionaries")
+    if not decision_rules:
+        raise ValueError("decision_rules must not be empty")
     checks = []
     for name, rule in decision_rules.items():
         if not callable(rule):
             raise ValueError(f"decision rule {name!r} must be callable")
-        checks.append({"rule": name, "passed": bool(rule(results))})
-    all_pass = all(item["passed"] for item in checks)
+        outcome = rule(results)
+        if outcome is not None and not isinstance(outcome, (bool, np.bool_)):
+            raise ValueError(f"decision rule {name!r} must return bool or None")
+        checks.append({"rule": name, "passed": None if outcome is None else bool(outcome)})
+    if any(item["passed"] is False for item in checks):
+        status = "fail"
+    elif any(item["passed"] is None for item in checks):
+        status = "insufficient_evidence"
+    else:
+        status = "pass"
     return {
-        "claim_gate_status": "pass" if all_pass else "fail",
+        "claim_gate_status": status,
         "checks": checks,
     }
