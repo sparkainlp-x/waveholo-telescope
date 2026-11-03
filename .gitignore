@@ -4,4 +4,8 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+benchmark-output/
+/results/smoke/
+/results/run-a/
+/results/run-b/
 .DS_Store

@@ -28,7 +28,11 @@ def default_rules(primary_rms_threshold=0.01, min_success_fraction=0.9):
         return _finite(results.get("null_control", {}).get("phase_rms"))
 
     def replication(results):
-        return results.get("primary", {}).get("success_fraction", {}).get("estimate", 0.0) >= min_success_fraction
+        primary = results.get("primary", {})
+        return (
+            int(primary.get("success_fraction", {}).get("n", 0)) >= 20
+            and primary.get("success_fraction", {}).get("estimate", 0.0) >= min_success_fraction
+        )
 
     def scope(results):
         return results.get("scope") == SCOPE
@@ -42,10 +46,10 @@ def default_rules(primary_rms_threshold=0.01, min_success_fraction=0.9):
 
 
 def evaluate(results, *, primary_rms_threshold=0.01, min_success_fraction=0.9):
+    results["scope"] = SCOPE
     gate = claim_gate(results, default_rules(primary_rms_threshold, min_success_fraction))
     results["claim_gate_status"] = gate["claim_gate_status"]
     results["claim_gate_checks"] = gate["checks"]
-    results["scope"] = SCOPE
     results["physical_claim"] = False
     return results
 

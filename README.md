@@ -1,138 +1,99 @@
-# waveholo-telescope v0.1.0
+# WaveHolo Telescope
 
-WaveHolo's off-axis digital holography pipeline, pointed at a
-telescope pupil. A distant star through a circular pupil carrying
-known Zernike aberrations is propagated to a sensor, recorded as
-an off-axis hologram, and reconstructed: the pupil plane is found
-by aperture contrast, and the wavefront at that plane is compared
-against the injected aberration. NumPy only, AGPL-3.0-only.
+Synthetic off-axis digital-holography benchmark for focus and wavefront recovery
+from a telescope pupil under parameterized Zernike aberrations.
 
-Bench parameters are WaveHolo's own, kept deliberately so this
-adaptation is comparable to the lab bench: wavelength 532 nm,
-pixel pitch 6.5 um, grid 256x256, carrier 80 bins, sideband
-half-width 48 bins, pupil-to-sensor distance 5.00 mm.
+**Evidence status:** SYNTHETIC only. No real telescope data.
 
-## Geometry
+**What this is:** A reproducible pre-implementation benchmark for evaluating
+focus and wavefront-recovery methods under controlled aberrations and noise.
 
-The pupil field is P = A * exp(i phi): A is 1 inside a disk of
-radius 64 px and 0 outside, phi is a Zernike sum in waves
-(defocus 0.4, astigmatism-x 0.3, coma-x 0.2 in the demo). The star
-is at infinity, so the incident field is a plane wave and the
-pupil itself is the object. Piston is excluded (unobservable in a
-hologram) and tip/tilt are excluded (pointing, absorbed by
-sideband centering); no spider vanes, central obstruction, or
-segmentation -- a clean circular pupil, so the bars measure the
-pipeline, not a particular telescope.
+**What this is not:** A validated telescope, adaptive-optics system, atmospheric-turbulence
+model validation, or demonstration on real observational data.
 
-## Pipeline
+## What this repository does
 
-Identical to waveholo v0.1.5: angular-spectrum propagation
-(evanescent components dropped), hologram H = |U + R|^2 with a
-reference tilted along x, sideband crop in Fourier space shifted
-to baseband, back-propagation sweep. Two metrics differ, because
-a pupil is a PHASE object and the lab bench's metrics assume an
-amplitude object:
+It simulates a circular pupil, injects a documented subset of Zernike phase terms,
+propagates and records an off-axis hologram, reconstructs the pupil field, estimates
+focus, and reports phase residuals against simulation ground truth.
 
-- aperture_contrast (focus metric, MAXIMAL at focus): at the true
-  pupil plane the amplitude IS the disk, so (mean |U|^2 inside -
-  mean |U|^2 outside) / (inside + outside) peaks there: 1 for a
-  perfect disk, 0 when inside and outside carry equal intensity.
-- phase_agreement (wavefront metric): |mean phasor of the wrapped
-  recovered-minus-injected phase difference| inside an eroded
-  mask (2 px, because the hard aperture edge is blurred by the
-  sideband window). 1 is perfect, 0 is random.
+## What this repository does not do
 
-## Measured bars (demo.py, 256x256)
+It does not process or validate real telescope observations, model validated
+atmospheric turbulence, control adaptive optics, or establish astronomical,
+observatory, or operational performance.
 
-- T1 focus: aperture-contrast peak 5.138 mm, error +0.138 mm
-  against the true 5.00 mm -- but the contrast at the true plane
-  is 0.9976 against a peak of 0.9976 (difference 0.0000 to four
-  decimals). The peak is FLAT-TOPPED: on this geometry the metric
-  locates the pupil plane only to ~±0.25 mm (the sweep step), not
-  better. That is a property of the metric, not a calibration
-  error, and it costs almost nothing: see T2.
-- T2 wavefront at the measured focus: RMS error 0.0066 waves,
-  agreement 0.9991 (eroded mask, 2 px; piston removed). At the true
-  plane the RMS is 0.0064 waves -- the ±0.25 mm focus uncertainty
-  costs 0.0002 waves.
-- T3 null control (no aberrations, true plane): RMS error
-  0.0057 waves. That is the pipeline floor (sideband windowing
-  plus discretization): the T2 error is essentially the floor,
-  not aberration-dependent error.
-- T4 noise (Gaussian noise, std 5% of mean hologram, clipped at
-  zero like a real sensor): focus 5.129 mm (error +0.129 mm),
-  wavefront RMS 0.0070 waves, agreement 0.9990. Noise barely
-  degrades anything at this level.
-- T5 secondary readout: WaveHolo's phase_variance minimum on the
-  same sweep sits at the 10.000 mm sweep EDGE (value 0.7514) --
-  no interior dip at the pupil plane. On telescope pupil data the
-  candidate universal metric does NOT locate focus. This is a
-  measured negative, kept, not a footnote: phase_variance assumes
-  a near-uniform phase at focus, and a pupil's aberration phase
-  is genuinely non-uniform there.
+## Scientific question
 
-## Two corrections made during the build
+Under synthetic telescope-pupil conditions with parameterized Zernike aberrations
+and noise, what is the accuracy and robustness of focus and wavefront recovery?
 
-- A first demo run reported a Pearson correlation of 0.9529
-  alongside an RMS error of 0.0066 waves. That 0.9529 was a seam
-  artifact: Pearson on wrapped phases counts the +-0.5 wave seam
-  as anti-correlation even when the wrapped difference is tiny.
-  It is not reported as a result anywhere; phase_agreement (the
-  circular statistic) replaces it.
-- The first aperture_contrast normalization divided by the
-  overall mean intensity, giving values above 1 (5.07). The
-  metric now divides by inside + outside, bounded in [-1, 1].
+## Method overview
 
-## Run it
+The current basis consists of unnormalized defocus, astigmatism, and coma terms;
+coefficients are in waves and piston is removed for comparison. Aperture contrast
+is maximized for focus. See [the scientific protocol](docs/SCIENTIFIC_PROTOCOL.md)
+and [API reference](docs/API_REFERENCE.md).
 
-```sh
-python3 demo.py          # bars T1-T5 (256x256, seconds)
-python3 tests/tests.py   # 13 tests, from the package root (128x128)
+## Primary metrics
+
+Residual RMS wavefront error is primary. Focus error, coefficient error, and
+sampling diagnostics are secondary. RMS phase error currently uses waves; radians
+and OPD conversions require the declared simulation wavelength. Definitions are in
+[METRICS.md](docs/METRICS.md).
+
+## Reproducible quickstart
+
+```bash
+python -m pip install -e ".[test]"
+make benchmark CONFIG=benchmarks/configs/telescope_smoke.yaml
 ```
 
-## Honest limits
+The smoke benchmark is an engineering check, not a publication-level factorial
+study. Results are written to a new directory and include provenance metadata. The
+3-seed smoke run is expected to fail the 20-seed claim gate and return exit code 2;
+that is a recorded gate failure, not a benchmark execution failure.
 
-- SYNTHETIC ONLY. No real telescope data has been run through
-  this package, and nothing here is a claim about any real
-  instrument, site, or adaptive-optics loop. The bars are
-  ground-truth comparisons on simulated holograms.
-- The focus location is coarse (~±0.25 mm on this geometry) for
-  the flat-top reason above; the wavefront itself is recovered
-  far more precisely (0.0066 waves) because it is insensitive to
-  that focus error.
-- The sideband window low-passes the wavefront: the recovered
-  phase is the injected aberration smoothed by the window, and
-  the pipeline floor (0.0057 waves) is the price.
-- Piston is unobservable, tip/tilt are excluded, the pupil is an
-  ideal disk. A real pupil (obstruction, spiders, segments,
-  atmosphere) would need those terms added and re-measured.
-- Authorship: Brisson only. No other author's code or paradigm
-  is contained in this package.
+## Benchmark results summary
 
-## Licence
+**UNRUN:** the preregistered factorial benchmark has not been run. No result is
+estimated or projected. The nominal configuration is a design specification only;
+the current runner cannot execute it until the radial-order basis, photon/read-noise
+models, and factorial runner are implemented. The runnable smoke command is
+`make benchmark CONFIG=benchmarks/configs/telescope_smoke.yaml OUTPUT=/tmp/telescope-smoke`.
 
-AGPL-3.0-only. See `LICENSE`.
+The existing v0.2.0 demo reported 5.138 mm estimated versus 5.000 mm truth,
+0.0066 waves RMS at estimated focus, and a negative result for phase-variance focus
+selection. Those are historical deterministic synthetic demo values, not repeated
+uncertainty-qualified benchmark results.
 
-## Scientific-readiness additions
+## Limitations and failure modes
 
-The package now validates field shapes, finite camera values, physical
-propagation parameters, integer carrier/window settings, and Fourier
-sideband fit. It also exposes `focus_sweep` and `parabolic_peak` for
-reusable focus analysis. `parabolic_peak` reports boundary status and a
-sampling-resolution diagnostic; its refinement is not a statistical
-confidence interval.
+The model uses an ideal circular pupil and a limited modal basis, with a rectangular
+sideband filter and simplified noise. Higher-order mode recovery, photon/read-noise
+effects, and the failure envelope are not yet established by the required factorial
+study. See [LIMITATIONS.md](docs/LIMITATIONS.md).
 
-The project remains synthetic-only. Before using camera or telescope data,
-follow `PHYSICAL_READINESS.md`, which specifies calibration, sideband
-separation checks, bench validation, acceptance reporting, and limitations
-that must be addressed before an instrument claim.
+## Real-data status
 
-## Documentation
+UNRUN. No real telescope data, atmospheric validation, laboratory instrument
+measurements, or adaptive-optics loop results are included.
 
-- [Technical documentation](docs/TECHNICAL_DOCUMENTATION.md): mathematical
-  model, numerical conventions, processing flow, validation, reproducibility,
-  and laboratory transition plan.
-- [API reference](docs/API_REFERENCE.md): public constants, functions,
-  parameters, return values, validation behavior, and examples.
-- [Physical-readiness plan](PHYSICAL_READINESS.md): calibration and bench
-  validation protocol before using recorded camera or telescope data.
+## Installation
+
+Python 3.10+ and NumPy are required. Development and test dependencies can be
+installed with `python -m pip install -e ".[test]"`.
+
+## Testing
+
+Run `make test` for unit, property, regression, and integration checks. CI runs a
+small smoke benchmark; it does not run the full factorial matrix.
+
+## Citation
+
+Cite the version identified in [`CITATION.cff`](CITATION.cff).
+
+## Licence and provenance
+
+AGPL-3.0-only. Results are SYNTHETIC and refer to generated inputs and the exact code
+commit recorded in each result manifest.

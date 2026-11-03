@@ -1,0 +1,23 @@
+name: Replication request
+description: Request an independent reproduction of a synthetic result
+title: "[REPLICATION] "
+labels: ["replication"]
+body:
+  - type: input
+    id: result
+    attributes:
+      label: Result/protocol version to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Exact command, config, seeds, and environment
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome and checksums
+    validations:
+      required: true

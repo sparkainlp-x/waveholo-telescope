@@ -1,0 +1,23 @@
+name: Claim correction
+description: Report a claim that exceeds synthetic evidence
+title: "[CLAIM CORRECTION] "
+labels: ["scientific-integrity"]
+body:
+  - type: input
+    id: location
+    attributes:
+      label: Claim location
+    validations:
+      required: true
+  - type: textarea
+    id: claim
+    attributes:
+      label: Exact claim and supporting evidence/status
+    validations:
+      required: true
+  - type: textarea
+    id: correction
+    attributes:
+      label: Suggested correction
+    validations:
+      required: true

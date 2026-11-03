@@ -1,0 +1,23 @@
+name: Benchmark dispute
+description: Report a reproducible disagreement with a synthetic benchmark
+title: "[BENCHMARK DISPUTE] "
+labels: ["benchmark"]
+body:
+  - type: input
+    id: protocol
+    attributes:
+      label: Protocol version, result bundle, and commit SHA
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Exact config, seed, and command
+    validations:
+      required: true
+  - type: textarea
+    id: difference
+    attributes:
+      label: Metric difference, uncertainty, and output checksums
+    validations:
+      required: true

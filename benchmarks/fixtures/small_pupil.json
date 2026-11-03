@@ -1,0 +1,9 @@
+{
+  "fixture_version": "1.0",
+  "data_type": "SYNTHETIC",
+  "grid": 64,
+  "pupil_radius_px": 16,
+  "aberration": {"defocus_waves": 0.1},
+  "generation": "waveholo_telescope.pupil.pupil_field",
+  "note": "Compact deterministic recipe; no large binary fixture is stored."
+}

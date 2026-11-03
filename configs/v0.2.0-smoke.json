@@ -2,6 +2,7 @@
   "schema_version": "1.0",
   "seeds": [11, 22, 33],
   "noise_levels": [0.0, 0.05],
+  "clip_negative_intensity": true,
   "grid": 128,
   "pupil_radius_px": 32,
   "true_distance_m": 0.005,
