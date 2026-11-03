@@ -1,0 +1,23 @@
+name: Bug report
+description: Report a reproducible software defect
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal synthetic reproduction
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Commit SHA and environment
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Expected and observed behavior
+    validations:
+      required: true

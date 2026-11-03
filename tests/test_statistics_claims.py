@@ -48,7 +48,7 @@ class TestClaims(unittest.TestCase):
         results = {
             "primary": {
                 "phase_rms_median": 0.005,
-                "success_fraction": {"estimate": 1.0},
+                "success_fraction": {"estimate": 1.0, "n": 20},
             },
             "null_control": {"phase_rms": 0.004},
         }
