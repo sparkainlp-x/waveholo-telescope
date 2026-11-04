@@ -26,6 +26,12 @@ def _nonnegative(value):
 def _success_fraction(primary):
     fraction = primary.get("success_fraction", {})
     estimate = _probability(fraction.get("estimate"), "success fraction", closed=True)
+    lower = _probability(fraction["lower"], "success fraction lower", closed=True) if "lower" in fraction else 0.0
+    upper = _probability(fraction["upper"], "success fraction upper", closed=True) if "upper" in fraction else 1.0
+    if lower > estimate or estimate > upper:
+        raise ValueError("success fraction interval must contain its estimate")
+    if "level" in fraction:
+        _probability(fraction["level"], "success fraction level")
     if "n" in fraction or "successes" in fraction:
         n = _integer(fraction.get("n"), "n", 1)
         successes = _integer(fraction.get("successes"), "successes")
@@ -33,6 +39,9 @@ def _success_fraction(primary):
             raise ValueError("success fraction is inconsistent with counts")
         if "n" in primary and _integer(primary["n"], "primary n", 1) != n:
             raise ValueError("primary n conflicts with success counts")
+        distribution = primary.get("phase_rms_distribution", {})
+        if "n" in distribution and _integer(distribution["n"], "distribution n", 1) != n:
+            raise ValueError("distribution n conflicts with success counts")
     elif "n" in primary:
         _integer(primary["n"], "primary n", 1)
     return estimate

@@ -32,8 +32,8 @@ default `test*.py` includes both `test_*.py` and the original `tests.py`;
 the bug was insufficient coverage, not an excluded original test module.
 The **12 focused measurement/configuration tests passed** after repair.
 
-Final integrated discovery by the claims/statistics worker passed **56 tests**
-(including 21 statistical/claim tests, the original optical tests and artifact
+Final integrated discovery by the claims/statistics worker passed **58 tests**
+(including 23 statistical/claim tests, the original optical tests and artifact
 validator regressions). The existing demo also completed successfully:
 
 ```sh
@@ -58,10 +58,10 @@ Final build tools: build 1.6.1 and Twine 7.0.0. Commands:
 
 ```sh
 WORK="$ROOT/.venv/artifact-validation"
-"$WORK/tools/bin/python" -m build --sdist --wheel --outdir "$WORK/final-reviewed"
-"$WORK/tools/bin/python" -m twine check "$WORK/final-reviewed/"*
+"$WORK/tools/bin/python" -m build --sdist --wheel --outdir "$WORK/final-contract"
+"$WORK/tools/bin/python" -m twine check "$WORK/final-contract/"*
 "$WORK/tools/bin/python" "$ROOT/tests/test_artifacts.py" \
-  --dist "$WORK/final-reviewed" --work-dir "$WORK/final-reviewed-installs"
+  --dist "$WORK/final-contract" --work-dir "$WORK/final-contract-installs"
 ```
 
 Both distributions passed Twine checks. The checker rebuilt the exact sdist,
@@ -74,7 +74,8 @@ and distribution installs. Nine artifact validator regression tests passed.
 Artifact integrity succeeded while smoke acceptance and scientific verdict
 both remained **fail**.
 
-SHA256 identities of the tested snapshot (not a reproducible-wheel-build claim):
+Earlier reviewed snapshot identities, retained for audit (not a
+reproducible-wheel-build claim):
 
 | Artifact | SHA256 |
 |---|---|
@@ -87,8 +88,23 @@ UTC `2026-11-04T23:21:01.087182+00:00`, config SHA256
 `00c60ad2717a3dd7bf8af63863dde85ea8cc27ae8d6048beb0c2a3680d6dcd22`,
 package-content SHA256
 `7a4a401bc13f2efb0161de9972f262f154b1b61e30795a2ebf6b744d274dadf7`.
-Subsequent documentation/workflow-only corrections do not change that tested
-package source inventory. Generated evidence is ignored, not published.
+That snapshot predates the final optional proportion-interval validation.
+
+The final-contract run also passed all four installed smoke checks, provenance
+and deterministic comparisons after rejecting invalid lower/upper/level fields
+and inconsistent distribution counts. Its identities are:
+
+| Artifact | SHA256 |
+|---|---|
+| Wheel | `8f463e85978e49e40375e18a2eff100f8af8c9431b3113cada5e480aae9a340f` |
+| Sdist | `83ee7c4647f5b79d8d3bb10a1f9d1beac0aab45ae396723fa70136f2f3f40710` |
+| Rebuilt wheel | `786bd55a2273246703a853bdac849a177e4d370c9c927468fee391e1d633183f` |
+
+Final installed-wheel smoke: same seeds/version/config hash, UTC
+`2026-11-04T23:23:28.561667+00:00`, package-content SHA256
+`835464bff8e17aca6dcb4cad420389824e69418f8088b75fc97d9fbfca7f2756`.
+Both verdicts remain **fail**. Subsequent documentation-only edits do not
+change that tested package inventory. Generated evidence is ignored, not published.
 
 The newly introduced checkout/setup-python Action references were verified
 against GitHub commits and pinned to full SHAs. Advisory checks reported no

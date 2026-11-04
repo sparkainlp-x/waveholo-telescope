@@ -209,6 +209,46 @@ class TestClaims(unittest.TestCase):
         result["primary"]["n"] = 11
         self.assertEqual(evaluate(result)["claim_gate_status"], "fail")
 
+    def test_success_interval_fields_fail_closed(self):
+        for field in ["lower", "upper", "level"]:
+            for value in [True, False, "0.95", None, float("nan"), float("inf"),
+                          -float("inf"), -0.1, 1.1]:
+                result = self.valid_result()
+                result["primary"]["success_fraction"][field] = value
+                with self.subTest(field=field, value=value):
+                    self.assertEqual(evaluate(result)["claim_gate_status"], "fail")
+        for value in [0, 1]:
+            result = self.valid_result()
+            result["primary"]["success_fraction"]["level"] = value
+            with self.subTest(level=value):
+                self.assertEqual(evaluate(result)["claim_gate_status"], "fail")
+        for interval in [
+            {"lower": 0.9, "upper": 0.8},
+            {"lower": 0.95},
+            {"upper": 0.85},
+        ]:
+            result = self.valid_result()
+            result["primary"]["success_fraction"] = {
+                "estimate": 0.9, "n": 10, "successes": 9, **interval,
+            }
+            with self.subTest(interval=interval):
+                self.assertEqual(evaluate(result)["claim_gate_status"], "fail")
+        result = self.valid_result()
+        result["primary"]["success_fraction"].update(lower=0, upper=1, level=0.95)
+        self.assertEqual(evaluate(result)["claim_gate_status"], "pass")
+        result["primary"]["success_fraction"]["lower"] = 1
+        self.assertEqual(evaluate(result)["claim_gate_status"], "pass")
+
+    def test_distribution_count_consistency(self):
+        for count in [True, "10", 10.0, 0, -1, float("nan"), float("inf"), 11]:
+            result = self.valid_result()
+            result["primary"]["phase_rms_distribution"] = {"n": count}
+            with self.subTest(count=count):
+                self.assertEqual(evaluate(result)["claim_gate_status"], "fail")
+        result = self.valid_result()
+        result["primary"]["phase_rms_distribution"] = {"n": 10}
+        self.assertEqual(evaluate(result)["claim_gate_status"], "pass")
+
     def test_smoke_is_not_scientific_evidence_and_does_not_mutate(self):
         result = self.valid_result()
         result.update(scientific_verdict="pass", protocol={"verified": True},
