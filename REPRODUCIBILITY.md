@@ -13,8 +13,9 @@ No physical telescope, quantum hardware, advantage or deployment claim follows.
 
 ## Exact local commands
 
-These commands were run from the task checkout; all generated artifacts are
-outside it. Fresh output paths are required.
+These commands were run from the task checkout. Parent smoke outputs use
+`/tmp`; worker build/install evidence uses the ignored `.venv/artifact-validation`
+directory. No generated artifacts are committed. Fresh output paths are required.
 
 ```sh
 ROOT=/home/runner/work/waveholo-telescope/waveholo-telescope
@@ -31,7 +32,7 @@ default `test*.py` includes both `test_*.py` and the original `tests.py`;
 the bug was insufficient coverage, not an excluded original test module.
 The **12 focused measurement/configuration tests passed** after repair.
 
-Final integrated discovery by the claims/statistics worker passed **52 tests**
+Final integrated discovery by the claims/statistics worker passed **56 tests**
 (including 21 statistical/claim tests, the original optical tests and artifact
 validator regressions). The existing demo also completed successfully:
 
@@ -44,6 +45,54 @@ git -C "$ROOT" diff --check
 
 The worker's scratch directory was created before discovery and removed after
 the run; it is not part of this PR. No new test framework was introduced.
+
+### Exact distribution validation
+
+The artifact worker reproduced the baseline failure by building/installing the
+original wheel into a fresh environment and invoking the legacy CLI with
+`--config configs/v0.2.0-smoke.json` and `--config smoke` from `/`.
+Both exited 1 with `FileNotFoundError`. The repair's packaged presets resolve
+without checkout-relative files.
+
+Final build tools: build 1.6.1 and Twine 7.0.0. Commands:
+
+```sh
+WORK="$ROOT/.venv/artifact-validation"
+"$WORK/tools/bin/python" -m build --sdist --wheel --outdir "$WORK/final-reviewed"
+"$WORK/tools/bin/python" -m twine check "$WORK/final-reviewed/"*
+"$WORK/tools/bin/python" "$ROOT/tests/test_artifacts.py" \
+  --dist "$WORK/final-reviewed" --work-dir "$WORK/final-reviewed-installs"
+```
+
+Both distributions passed Twine checks. The checker rebuilt the exact sdist,
+installed each wheel into a separate fresh venv, and invoked both
+`waveholo-benchmark` and `worldholo-benchmark` with `--config smoke` from `/`
+(outside the checkout, without PYTHONPATH/PYTHONHOME). All four runs passed
+strict JSON, checksum, nonempty installed-provenance and scope validation.
+Raw results, analysis, claims and report were byte-identical across aliases
+and distribution installs. Nine artifact validator regression tests passed.
+Artifact integrity succeeded while smoke acceptance and scientific verdict
+both remained **fail**.
+
+SHA256 identities of the tested snapshot (not a reproducible-wheel-build claim):
+
+| Artifact | SHA256 |
+|---|---|
+| Wheel | `539381a0ca19c9d03ca3f9549b3a4b7fea4be25df6d30a2a1299ccbb7fa74c4e` |
+| Sdist | `d02c45c380c2dc47886e0b2c339ceebe7fc61bf1a1530b9ab3095e6399aa3417` |
+| Wheel rebuilt from that sdist | `9b7c3c147031675aaf58d20d894d52a521d2b168efa4db4ebeadd71ba8a86b7b` |
+
+Installed-wheel smoke provenance: seeds `[11,22,33]`, package 0.2.0,
+UTC `2026-11-04T23:21:01.087182+00:00`, config SHA256
+`00c60ad2717a3dd7bf8af63863dde85ea8cc27ae8d6048beb0c2a3680d6dcd22`,
+package-content SHA256
+`7a4a401bc13f2efb0161de9972f262f154b1b61e30795a2ebf6b744d274dadf7`.
+Subsequent documentation/workflow-only corrections do not change that tested
+package source inventory. Generated evidence is ignored, not published.
+
+The newly introduced checkout/setup-python Action references were verified
+against GitHub commits and pinned to full SHAs. Advisory checks reported no
+vulnerabilities for those references and the build/Twine tooling.
 
 Baseline benchmark reproduction loaded the original module/config from Git
 without changing branches:
@@ -202,3 +251,11 @@ Smoke acceptance is not a seed gate or scientific verdict. A failed gate is
 an honest negative result, not a reason to block artifact integrity validation
 or to relax success criteria. Missing protocol/control evidence never supports
 a positive scientific claim. No protocol is called preregistered here.
+
+## Security review
+
+Changed files passed secret scanning. The first CodeQL review found no Python
+alerts and one missing-token-permissions alert in the new clean-install job;
+that job now explicitly grants only `contents: read`. The final review result
+is recorded with the PR checks; no scientific verdict follows from security
+validation.
