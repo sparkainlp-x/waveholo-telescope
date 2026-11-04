@@ -7,35 +7,10 @@ an off-axis hologram, and reconstructed: the pupil plane is found
 by aperture contrast, and the wavefront at that plane is compared
 against the injected aberration. NumPy only, AGPL-3.0-only.
 
-## Wavefront Clinic game
-
-**[Play Wavefront Clinic](docs/game/index.html)** — an offline,
-browser-only synthetic adaptive-optics game.
-
-A telescope pupil carries hidden low-order Zernike aberrations.
-Correct defocus, astigmatism, coma, and trefoil while observing
-three linked views:
-
-- **Point-spread function:** 256 × 256 Fraunhofer Fourier transform,
-  displayed on a logarithmic intensity scale.
-- **Off-axis hologram:** intensity of the pupil field interfered with
-  a tilted reference wave, `H = |U + R|²`.
-- **Pupil phase:** residual wavefront phase after the player’s
-  correction.
-
-The game reports residual RMS wavefront error in waves, the Marechal
-Strehl approximation, fractional energy in the central Airy-scale
-region, and a level score. A level can be locked once its approximate
-Strehl ratio reaches 80 percent, the usual Marechal criterion.
-
-After locking a level, **Reveal truth** shows the injected phase and
-the residual phase after correction.
-
-**Scope:** Wavefront Clinic is a synthetic educational simulation.
-It uses a circular pupil, four normalized low-order Zernike modes,
-and a simplified Fraunhofer point-spread-function calculation. It does
-not simulate atmospheric turbulence, a real adaptive-optics loop,
-telescope hardware, or astronomical observations.
+Bench parameters are WaveHolo's own, kept deliberately so this
+adaptation is comparable to the lab bench: wavelength 532 nm,
+pixel pitch 6.5 um, grid 256x256, carrier 80 bins, sideband
+half-width 48 bins, pupil-to-sensor distance 5.00 mm.
 
 ## Geometry
 
@@ -77,8 +52,8 @@ amplitude object:
   better. That is a property of the metric, not a calibration
   error, and it costs almost nothing: see T2.
 - T2 wavefront at the measured focus: RMS error 0.0066 waves,
-  agreement 0.9991 (eroded mask, 2 px; piston removed). At the
-  true plane the RMS is 0.0064 waves -- the ±0.25 mm focus uncertainty
+  agreement 0.9991 (eroded mask, 2 px; piston removed). At the true
+  plane the RMS is 0.0064 waves -- the ±0.25 mm focus uncertainty
   costs 0.0002 waves.
 - T3 null control (no aberrations, true plane): RMS error
   0.0057 waves. That is the pipeline floor (sideband windowing
@@ -115,8 +90,66 @@ python3 demo.py          # bars T1-T5 (256x256, seconds)
 python3 tests/tests.py   # 13 tests, from the package root (128x128)
 ```
 
-Open `docs/game/index.html` in a browser to play Wavefront Clinic.
-The game is standalone and performs all calculations locally.
+## Wavefront Clinic
+
+`docs/game/index.html` is a self-contained, offline, dependency-free
+educational simulation called **Wavefront Clinic**. It replaces the
+previous game and is intended to make Zernike aberrations, diffraction,
+and wavefront-quality metrics visually tangible.
+
+Open it directly in a modern browser, or serve the repository root and
+visit `docs/game/index.html`. No network access, build step, external
+font, JavaScript library, or telemetry is required.
+
+### What it simulates
+
+- A 256 x 256 circular pupil with a Fraunhofer point-spread function
+  (PSF), rendered on a logarithmic intensity scale so faint diffraction
+  structure remains visible.
+- Noll-style normalized Zernike correction modes: defocus, astigmatism
+  X/Y, coma X/Y, and trefoil X/Y.
+- An idealized off-axis hologram view, with a tilted reference wave.
+- Pupil phase, injected phase, residual phase, and correction-error
+  visualizations.
+
+### Metrics
+
+- **Residual RMS wavefront error**, expressed in waves, after the
+  player's correction coefficients are subtracted from the injected
+  aberration.
+- **Marechal Strehl approximation**, `exp(-(2*pi*sigma)^2)`, where
+  `sigma` is the residual RMS in waves.
+- **Encircled energy**, the fraction of PSF energy inside a small
+  fixed radius around the PSF core.
+- **Score**, a weighted combination of Strehl and encircled energy.
+
+### Levels and locking
+
+The game includes five deterministic, seeded levels with progressively
+larger and more varied aberration coefficients. A level can be locked
+only when its approximate Marechal Strehl reaches at least **0.80**,
+a simplified representation of the Marechal criterion.
+
+After locking, **Reveal diagnosis** displays the injected phase,
+residual phase, and correction error. This makes the difference between
+the applied correction and the remaining wavefront error explicit.
+
+### Controls
+
+- Use the sliders to adjust each Zernike correction coefficient.
+- Use the left and right arrow keys to change the selected coefficient.
+- Use the up and down arrow keys to move between modes.
+- Use keys `1` through `7` to select a correction mode directly.
+- Use **New seeded level**, **Reset correction**, **Lock wavefront**,
+  and **Reveal diagnosis** with mouse, touch, or keyboard.
+
+### Scope and limitations
+
+Wavefront Clinic is **synthetic and educational only**. It is not a
+wavefront sensor, telescope diagnostic, adaptive-optics controller,
+or medical device. Its hologram and PSF views are simplified teaching
+visualizations; they do not replace the repository's numerical
+pipeline, its measured benchmarks, or the physical-readiness protocol.
 
 ## Honest limits
 
@@ -134,10 +167,6 @@ The game is standalone and performs all calculations locally.
 - Piston is unobservable, tip/tilt are excluded, the pupil is an
   ideal disk. A real pupil (obstruction, spiders, segments,
   atmosphere) would need those terms added and re-measured.
-- Wavefront Clinic is a simplified educational game: four Zernike
-  modes, a circular pupil, a simplified Fraunhofer PSF calculation,
-  and no atmospheric turbulence, sensor noise, adaptive-optics
-  loop, or telescope hardware model.
 - Authorship: Brisson only. No other author's code or paradigm
   is contained in this package.
 
@@ -168,6 +197,3 @@ that must be addressed before an instrument claim.
   parameters, return values, validation behavior, and examples.
 - [Physical-readiness plan](PHYSICAL_READINESS.md): calibration and bench
   validation protocol before using recorded camera or telescope data.
-- [Wavefront Clinic game](docs/game/index.html): synthetic browser game for
-  Zernike aberrations, Fraunhofer point-spread functions, off-axis
-  holograms, and Marechal-criterion correction.
