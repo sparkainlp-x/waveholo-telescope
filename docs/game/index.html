@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wavefront Clinic — Synthetic Telescope Adaptive Optics</title>
+<meta name="description" content="An offline synthetic telescope game: diagnose and correct Zernike wavefront aberrations, sharpen the point-spread function, and inspect the off-axis hologram.">
+<style>
+:root{--bg:#04060d;--ink:#e9f0ff;--dim:#8fa0bf;--line:#1d2942;--panel:rgba(13,20,36,.82);--teal:#5eead4;--indigo:#818cf8;--pink:#f0abfc;--amber:#fbbf24;--red:#fb7185}
+*{box-sizing:border-box}html,body{height:100%}body{margin:0;color:var(--ink);font:15px/1.5 Inter,system-ui,-apple-system,Segoe UI,sans-serif;background:#04060d;overflow-x:hidden}#stars{position:fixed;inset:0;z-index:-1;opacity:.55}a{color:#9ddfd3}.shell{max-width:1280px;margin:0 auto;padding:28px 18px 60px}.top{text-align:center;margin-bottom:22px}.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#7dd3fc;border:1px solid #173b55;background:rgba(7,21,38,.7);padding:6px 12px;border-radius:999px}h1{margin:16px 0 8px;font-size:clamp(34px,6vw,62px);line-height:1;letter-spacing:-.035em;font-weight:800}h1 .grad{background:linear-gradient(92deg,var(--teal),var(--indigo) 48%,var(--pink));-webkit-background-clip:text;background-clip:text;color:transparent}.lede{max-width:760px;margin:0 auto;color:#b9c7de}.warning{display:inline-block;margin-top:16px;padding:7px 13px;border:1px solid rgba(251,191,36,.5);background:rgba(251,191,36,.08);color:#fde68a;border-radius:999px;font-size:12px}.layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,.85fr);gap:18px}@media(max-width:1000px){.layout{grid-template-columns:1fr}}.panel{position:relative;border:1px solid var(--line);border-radius:20px;background:linear-gradient(180deg,rgba(19,29,51,.9),rgba(7,11,22,.92));box-shadow:0 30px 80px rgba(0,0,0,.45);padding:18px;backdrop-filter:blur(10px)}.panel h2{margin:0 0 4px;font-size:17px;letter-spacing:-.01em}.panel .hint{margin:0 0 14px;color:var(--dim);font-size:13px}.views{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}@media(max-width:760px){.views{grid-template-columns:1fr}}.view{border:1px solid #16223c;border-radius:14px;overflow:hidden;background:#01030a}.view canvas{display:block;width:100%;aspect-ratio:1}.view .cap{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;font-size:11px;color:var(--dim);background:rgba(4,8,18,.85);border-top:1px solid #16223c}.badges{display:flex;gap:6px;flex-wrap:wrap}.badge{font-size:10px;padding:3px 7px;border-radius:999px;border:1px solid #24344f;color:#9fb0cd}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}@media(max-width:620px){.metrics{grid-template-columns:repeat(2,1fr)}}.metric{border:1px solid var(--line);border-radius:14px;padding:12px;background:rgba(5,10,22,.75)}.metric .k{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}.metric .v{font-size:22px;font-weight:750;margin-top:3px;font-variant-numeric:tabular-nums}.metric .n{font-size:11px;color:#64748b;margin-top:2px}.controls{display:grid;gap:14px;margin-top:6px}.control{display:grid;grid-template-columns:112px 1fr 70px;gap:10px;align-items:center}.control label{font-size:13px;color:#b9c7de}.control .read{font-variant-numeric:tabular-nums;text-align:right;font-size:12px;color:var(--dim)}input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:999px;background:linear-gradient(90deg,#1e293b,#334155);outline:none}input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:linear-gradient(135deg,var(--teal),var(--indigo));border:2px solid #04101d;box-shadow:0 0 0 3px rgba(94,234,212,.14);cursor:pointer}input[type=range]:focus-visible{outline:2px solid var(--teal);outline-offset:3px}.modes{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0 4px}.chip{font-size:11px;padding:5px 9px;border-radius:999px;border:1px solid #24344f;color:#9fb0cd;background:rgba(8,14,28,.7)}.chip.on{border-color:rgba(94,234,212,.55);color:#99f6e4;background:rgba(20,184,166,.10)}.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}button{appearance:none;border:1px solid #263650;background:#101a2e;color:var(--ink);border-radius:11px;padding:11px 15px;font-weight:650;font-size:13px;cursor:pointer;transition:.16s}button:hover{border-color:#3b5377;transform:translateY(-1px)}button:focus-visible{outline:2px solid var(--teal);outline-offset:2px}button.primary{border-color:transparent;background:linear-gradient(92deg,#0d9488,#4f46e5);box-shadow:0 10px 24px rgba(79,70,229,.25)}button:disabled{opacity:.4;cursor:not-allowed;transform:none}.levels{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-bottom:14px}.level{padding:9px 6px;border-radius:11px;border:1px solid #22304b;background:#081020;color:#94a3b8;font-size:11px;text-align:center;cursor:pointer}.level.active{border-color:var(--teal);color:#ccfbf1;background:rgba(20,184,166,.10)}.level.complete{border-color:#14b8a6;color:#5eead4}.console{margin-top:14px;border:1px solid var(--line);border-radius:14px;background:rgba(3,8,18,.8);padding:12px;font-size:13px;color:#a9bad6;min-height:64px}.console.good{border-color:rgba(20,184,166,.55);color:#99f6e4}.console.warn{border-color:rgba(251,191,36,.5);color:#fde68a}.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--dim)}.swatch{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px}.reveal{display:none;margin-top:14px;border-top:1px dashed #24344f;padding-top:14px}.reveal.show{display:block}.reveal h3{margin:0 0 8px;font-size:14px}.reveal .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}@media(max-width:620px){.reveal .row{grid-template-columns:1fr}}footer{max-width:1280px;margin:26px auto 0;padding:0 18px;color:#5f6f8c;font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+<div class="shell">
+<div class="top">
+<div class="eyebrow">Synthetic adaptive-optics laboratory</div>
+<h1>Wavefront <span class="grad">Clinic</span></h1>
+<p class="lede">Diagnose aberrations in a simulated telescope pupil. Correct defocus, astigmatism, coma, and trefoil; watch the diffraction-limited point-spread function recover while the off-axis hologram responds in real time.</p>
+<div class="warning">Synthetic educational simulation · Not a hardware, telescope, adaptive-optics-loop, or astronomy validation</div>
+</div>
+<div class="layout">
+<main class="panel">
+<h2>Telescope sensor</h2>
+<p class="hint">The point-spread function is computed from the pupil field with a 256 × 256 Fraunhofer Fourier transform. The hologram is the intensity of the pupil field interfered with a tilted reference wave.</p>
+<div class="views">
+<div class="view"><canvas id="psf" width="256" height="256"></canvas><div class="cap"><span>Point-spread function</span><span class="badges"><span class="badge">log intensity</span></span></div></div>
+<div class="view"><canvas id="hologram" width="256" height="256"></canvas><div class="cap"><span>Off-axis hologram</span><span class="badges"><span class="badge">|U + R|²</span></span></div></div>
+<div class="view"><canvas id="phase" width="256" height="256"></canvas><div class="cap"><span>Pupil phase</span><span class="badges"><span class="badge">residual</span></span></div></div>
+</div>
+<div class="metrics">
+<div class="metric"><div class="k">Residual RMS</div><div class="v" id="rms">—</div><div class="n">waves</div></div>
+<div class="metric"><div class="k">Marechal Strehl</div><div class="v" id="strehl">—</div><div class="n">approximation</div></div>
+<div class="metric"><div class="k">Core energy</div><div class="v" id="energy">—</div><div class="n">central Airy disk</div></div>
+<div class="metric"><div class="k">Score</div><div class="v" id="score">—</div><div class="n">level result</div></div>
+</div>
+<div class="legend"><span><i class="swatch" style="background:#312e81"></i>-1 wave</span><span><i class="swatch" style="background:#0f766e"></i>0</span><span><i class="swatch" style="background:#fbbf24"></i>+1 wave</span><span>Lock target: Strehl ≥ 80%</span></div>
+</main>
+<aside class="panel">
+<h2>Wavefront correction</h2>
+<p class="hint">Each level hides a different combination of low-order aberrations. Use the PSF shape and hologram fringes as diagnostic evidence.</p>
+<div class="levels" id="levels"></div>
+<div class="modes" id="modeChips"></div>
+<div class="controls">
+<div class="control"><label for="defocus">Defocus</label><input id="defocus" type="range" min="-1" max="1" step="0.001" value="0" aria-label="Correct defocus aberration"><span class="read" id="defocusV">0.000 waves</span></div>
+<div class="control"><label for="astigmatism">Astigmatism</label><input id="astigmatism" type="range" min="-1" max="1" step="0.001" value="0" aria-label="Correct astigmatism aberration"><span class="read" id="astigmatismV">0.000 waves</span></div>
+<div class="control"><label for="coma">Coma</label><input id="coma" type="range" min="-1" max="1" step="0.001" value="0" aria-label="Correct coma aberration"><span class="read" id="comaV">0.000 waves</span></div>
+<div class="control"><label for="trefoil">Trefoil</label><input id="trefoil" type="range" min="-1" max="1" step="0.001" value="0" aria-label="Correct trefoil aberration"><span class="read" id="trefoilV">0.000 waves</span></div>
+</div>
+<div class="actions">
+<button class="primary" id="lock">Lock correction</button>
+<button id="reset">Reset level</button>
+<button id="reveal" disabled>Reveal truth</button>
+<button id="next" disabled>Next level →</button>
+</div>
+<div class="console" id="console">Adjust a correction and watch the central core concentrate. A lower residual RMS produces a higher Marechal Strehl approximation and tighter diffraction pattern.</div>
+<div class="reveal" id="revealPanel">
+<h3>Level diagnosis</h3>
+<div class="row">
+<div><div class="hint">Injected phase</div><canvas id="truthPhase" width="256" height="256" style="width:100%;aspect-ratio:1;border-radius:10px;border:1px solid #16223c"></canvas></div>
+<div><div class="hint">Residual phase after correction</div><canvas id="residualPhase" width="256" height="256" style="width:100%;aspect-ratio:1;border-radius:10px;border:1px solid #16223c"></canvas></div>
+</div>
+</div>
+</aside>
+</div>
+</div>
+<footer>Wavefront Clinic · <a href="https://github.com/sparkainlp-x/waveholo-telescope">waveholo-telescope</a> · Synthetic only · AGPL-3.0-only</footer>
+<script>
+'use strict';
+const N=256,PUPIL_R=86,C=N/2,TAU=Math.PI*2;
+const canvas={psf:document.getElementById('psf'),hologram:document.getElementById('hologram'),phase:document.getElementById('phase'),truthPhase:document.getElementById('truthPhase'),residualPhase:document.getElementById('residualPhase')};
+const contexts={};for(const k in canvas)contexts[k]=canvas[k].getContext('2d',{willReadFrequently:false});
+const modes=[
+ {id:'defocus',label:'Defocus',noll:'Z₄',z:(x,y)=>Math.sqrt(3)*(2*(x*x+y*y)-1)},
+ {id:'astigmatism',label:'Astigmatism',noll:'Z₅',z:(x,y)=>Math.sqrt(6)*(x*x-y*y)},
+ {id:'coma',label:'Coma',noll:'Z₇',z:(x,y)=>Math.sqrt(8)*(3*(x*x+y*y)-2)*x},
+ {id:'trefoil',label:'Trefoil',noll:'Z₁₀',z:(x,y)=>Math.sqrt(8)*(x*x*x-3*x*y*y)}
+];
+let level=1,completed=new Set(),best=JSON.parse(localStorage.getItem('wavefront-clinic-best')||'{}');
+let truth={},correction={},last=null;
+const $=id=>document.getElementById(id);
+function mulberry(seed){let a=seed>>>0;return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function levelSpec(n){
+ const specs=[
+  {modes:['defocus'],scale:.55},
+  {modes:['defocus','astigmatism'],scale:.55},
+  {modes:['astigmatism','coma'],scale:.55},
+  {modes:['defocus','astigmatism','coma'],scale:.60},
+  {modes:['defocus','astigmatism','coma','trefoil'],scale:.65}
+ ];return specs[n-1]}
+function makeLevel(n){
+ level=n;const spec=levelSpec(n),rng=mulberry(0xC0FFEE+n*7919);truth={};correction={};
+ for(const m of modes){truth[m.id]=spec.modes.includes(m.id)?(rng()*2-1)*spec.scale:0;correction[m.id]=0;$(m.id).value=0;$(m.id+'V').textContent='0.000 waves'}
+ $('revealPanel').classList.remove('show');$('reveal').disabled=true;$('next').disabled=true;
+ renderModeChips();render();setLevels();
+ setConsole(`Level ${n}: diagnose and correct the hidden wavefront error. Target the Marechal criterion: approximate Strehl ≥ 80%.`)}
+function renderModeChips(){const box=$('modeChips');box.innerHTML='';for(const m of modes){const active=Math.abs(truth[m.id])>1e-4;const chip=document.createElement('span');chip.className='chip'+(active?' on':'');chip.textContent=`${m.label} ${m.noll}`;box.appendChild(chip)}}
+function setLevels(){const box=$('levels');box.innerHTML='';for(let i=1;i<=5;i++){const b=document.createElement('button');b.className='level'+(i===level?' active':'')+(completed.has(i)?' complete':'');b.textContent=`Level ${i}\n${best[i]?best[i]+' pts':'—'}`;b.setAttribute('aria-label',`Select level ${i}`);b.onclick=()=>makeLevel(i);box.appendChild(b)}}
+function setConsole(text,kind=''){const el=$('console');el.textContent=text;el.className='console '+kind}
+function phaseColor(v){
+ const t=Math.max(-1,Math.min(1,v));
+ if(t<0){const u=-t;return[Math.round(49+u*(94-49)),Math.round(46+u*(209-46)),Math.round(129+u*(209-129))]}
+ const u=t;return[Math.round(15+u*(251-15)),Math.round(118+u*(191-118)),Math.round(110+u*(36-110))]}
+function drawPhase(ctx,phase){
+ const img=ctx.createImageData(N,N);let mx=1e-9;for(let i=0;i<N*N;i++)mx=Math.max(mx,Math.abs(phase[i]));
+ for(let j=0;j<N;j++)for(let i=0;i<N;i++){const x=(i-C)/PUPIL_R,y=(j-C)/PUPIL_R,o=(j*N+i)*4;
+  if(x*x+y*y>1){img.data[o]=4;img.data[o+1]=7;img.data[o+2]=16;img.data[o+3]=255;continue}
+  const[r,g,b]=phaseColor(phase[i+j*N]/mx);img.data[o]=r;img.data[o+1]=g;img.data[o+2]=b;img.data[o+3]=255}
+ ctx.putImageData(img,0,0)}
+function residualPhase(){
+ const phase=new Float32Array(N*N);
+ for(let j=0;j<N;j++)for(let i=0;i<N;i++){const x=(i-C)/PUPIL_R,y=(j-C)/PUPIL_R;if(x*x+y*y>1)continue;let p=0;for(const m of modes)p+=(truth[m.id]-correction[m.id])*m.z(x,y);phase[j*N+i]=p}
+ return phase}
+function fft2(re,im){
+ for(let y=0;y<N;y++)fft(re,im,y*N);
+ const cr=new Float32Array(N),ci=new Float32Array(N);
+ for(let x=0;x<N;x++){for(let y=0;y<N;y++){cr[y]=re[y*N+x];ci[y]=im[y*N+x]}fft(cr,ci,0);for(let y=0;y<N;y++){re[y*N+x]=cr[y];im[y*N+x]=ci[y]}}}
+function fft(re,im,offset){
+ const n=N;for(let i=1,j=0;i<n;i++){let bit=n>>1;for(;j&bit;bit>>=1)j^=bit;j^=bit;if(i<j){const a=offset+i,b=offset+j;let t=re[a];re[a]=re[b];re[b]=t;t=im[a];im[a]=im[b];im[b]=t}}
+ for(let len=2;len<=n;len<<=1){const ang=-TAU/len,wr=Math.cos(ang),wi=Math.sin(ang);
+  for(let i=0;i<n;i+=len){let cr=1,ci=0;
+   for(let j=0;j<len/2;j++){const a=offset+i+j,b=a+j+len/2,tr=re[b]*cr-im[b]*ci,ti=re[b]*ci+im[b]*cr;
+    re[b]=re[a]-tr;im[b]=im[a]-ti;re[a]+=tr;im[a]+=ti;const nr=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=nr}}}}
+function turbo(v){
+ v=Math.max(0,Math.min(1,v));
+ const r=Math.min(255,Math.max(0,34+v*547*(v<.5?1:1.2-0.4*v)));
+ const g=Math.min(255,Math.max(0,20+640*v*(1-v)*1.7));
+ const b=Math.min(255,Math.max(0,90+330*(1-v)*(v<.75?1:.25)));
+ return[r,g,b]}
+function render(){
+ const re=new Float32Array(N*N),im=new Float32Array(N*N),phase=residualPhase();
+ for(let j=0;j<N;j++)for(let i=0;i<N;i++){const x=(i-C)/PUPIL_R,y=(j-C)/PUPIL_R;if(x*x+y*y>1)continue;const idx=j*N+i;re[idx]=1;im[idx]=phase[idx]*TAU}
+ const fre=Float32Array.from(re),fim=Float32Array.from(im);fft2(fre,fim);
+ const psf=new Float32Array(N*N);let peak=0,total=0,core=0;
+ for(let i=0;i<N*N;i++){const p=fre[i]*fre[i]+fim[i]*fim[i];psf[i]=p;total+=p;if(p>peak)peak=p}
+ const coreR=Math.round(N/PUPIL_R*1.22);
+ for(let j=0;j<N;j++)for(let i=0;i<N;i++){if(Math.hypot(i-C,j-C)<=coreR)core+=psf[j*N+i]}
+ const pc=contexts.psf,img=pc.createImageData(N,N);
+ for(let i=0;i<N*N;i++){const norm=psf[i]/peak;const v=Math.pow(Math.max(norm,1e-9),0.22);const o=i*4;img.data[o]=v*168;img.data[o+1]=v*225;img.data[o+2]=v*255;img.data[o+3]=255}
+ pc.putImageData(img,0,0);
+ const hc=contexts.hologram,hImg=hc.createImageData(N,N),carrier=22;
+ for(let j=0;j<N;j++)for(let i=0;i<N;i++){const idx=j*N+i;const inside=Math.hypot(i-C,j-C)<=PUPIL_R;const refPhase=carrier*TAU*i/N;const interference=inside?1.55+Math.cos(phase[idx]*TAU+refPhase):0.08;const v=Math.max(0,Math.min(1,interference/2.55));const[r,g,b]=turbo(v);const o=idx*4;hImg.data[o]=r;hImg.data[o+1]=g;hImg.data[o+2]=b;hImg.data[o+3]=255}
+ hc.putImageData(hImg,0,0);
+ drawPhase(contexts.phase,phase);
+ let sum=0,count=0;for(let i=0;i<N*N;i++){if(re[i]===1){sum+=phase[i]*phase[i];count++}}
+ const rms=Math.sqrt(sum/count),strehl=Math.exp(-Math.pow(TAU*rms,2)),coreFraction=core/total,score=Math.max(0,Math.round(1000*Math.pow(strehl,2.2)*(0.65+0.35*Math.min(1,coreFraction/0.84))));
+ $('rms').textContent=rms.toFixed(4);$('strehl').textContent=(strehl*100).toFixed(1)+'%';$('energy').textContent=(coreFraction*100).toFixed(1)+'%';$('score').textContent=score;
+ last={rms,strehl,score,coreFraction};return last}
+function update(){
+ for(const m of modes){correction[m.id]=parseFloat($(m.id).value);$(m.id+'V').textContent=correction[m.id].toFixed(3)+' waves'}
+ const r=render();
+ if(r.strehl>=.8)setConsole(`Marechal criterion met: residual RMS ${r.rms.toFixed(4)} waves, approximate Strehl ${(r.strehl*100).toFixed(1)}%. Lock the correction to record the diagnosis.`,'good');
+ else if(r.strehl>=.5)setConsole(`Improving: residual RMS ${r.rms.toFixed(4)} waves. The central core is concentrating, but diffraction structure remains distorted.`,'warn');
+ else setConsole(`Residual RMS ${r.rms.toFixed(4)} waves. Use the PSF asymmetry and hologram fringe curvature to identify the dominant aberration.`)}
+for(const m of modes)$(m.id).addEventListener('input',update);
+$('lock').addEventListener('click',()=>{
+ const r=render();
+ if(r.strehl<.8){setConsole(`Cannot lock: approximate Strehl is ${(r.strehl*100).toFixed(1)}%. The Marechal target is 80%.`,'warn');return}
+ completed.add(level);const previous=best[level]||0;if(r.score>previous){best[level]=r.score;localStorage.setItem('wavefront-clinic-best',JSON.stringify(best))}
+ $('reveal').disabled=false;if(level<5)$('next').disabled=false;setLevels();
+ setConsole(`Level ${level} locked. Score ${r.score}; best ${best[level]}. Open “Reveal truth” to compare injected and residual phase.`,'good')});
+$('reset').addEventListener('click',()=>makeLevel(level));
+$('next').addEventListener('click',()=>makeLevel(Math.min(5,level+1)));
+$('reveal').addEventListener('click',()=>{
+ const tp=new Float32Array(N*N),rp=residualPhase();
+ for(let j=0;j<N;j++)for(let i=0;i<N;i++){const x=(i-C)/PUPIL_R,y=(j-C)/PUPIL_R;if(x*x+y*y>1)continue;let p=0;for(const m of modes)p+=truth[m.id]*m.z(x,y);tp[j*N+i]=p}
+ drawPhase(contexts.truthPhase,tp);drawPhase(contexts.residualPhase,rp);$('revealPanel').classList.add('show')});
+addEventListener('keydown',e=>{if(e.key==='Enter'&&document.activeElement===$('lock'))$('lock').click();if(e.key.toLowerCase()==='r')makeLevel(level)});
+const starCtx=$('stars').getContext('2d');function drawStars(){starCtx.canvas.width=innerWidth;starCtx.canvas.height=innerHeight;starCtx.clearRect(0,0,innerWidth,innerHeight);const rng=mulberry(2026);for(let i=0;i<220;i++){const x=rng()*innerWidth,y=rng()*innerHeight,r=rng()*1.25+.15,a=.15+rng()*.65;starCtx.beginPath();starCtx.arc(x,y,r,0,TAU);starCtx.fillStyle=`rgba(190,220,255,${a})`;starCtx.fill()}}
+drawStars();addEventListener('resize',drawStars);makeLevel(1);
+</script>
+</body>
+</html>
