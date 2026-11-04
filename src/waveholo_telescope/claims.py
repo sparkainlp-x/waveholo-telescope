@@ -7,49 +7,114 @@ atmosphere, adaptive-optics system, or observatory deployment.
 """
 from __future__ import annotations
 
-from .statistics import claim_gate
+from copy import deepcopy
+import math
+
+from .acceptance import resolve_acceptance
+from .statistics import _integer, _probability, _real, claim_gate
 
 SCOPE = "synthetic_simulation_only"
 
 
-def _finite(value):
+def _nonnegative(value):
     try:
-        number = float(value)
-    except (TypeError, ValueError):
+        return _real(value, "RMS") >= 0
+    except ValueError:
         return False
-    return number == number and abs(number) != float("inf")
+
+
+def _success_fraction(primary):
+    fraction = primary.get("success_fraction", {})
+    estimate = _probability(fraction.get("estimate"), "success fraction", closed=True)
+    lower = _probability(fraction["lower"], "success fraction lower", closed=True) if "lower" in fraction else 0.0
+    upper = _probability(fraction["upper"], "success fraction upper", closed=True) if "upper" in fraction else 1.0
+    if lower > estimate or estimate > upper:
+        raise ValueError("success fraction interval must contain its estimate")
+    if "level" in fraction:
+        _probability(fraction["level"], "success fraction level")
+    if "n" in fraction or "successes" in fraction:
+        n = _integer(fraction.get("n"), "n", 1)
+        successes = _integer(fraction.get("successes"), "successes")
+        if successes > n or not math.isclose(estimate, successes / n, rel_tol=1e-12, abs_tol=1e-12):
+            raise ValueError("success fraction is inconsistent with counts")
+        if "n" in primary and _integer(primary["n"], "primary n", 1) != n:
+            raise ValueError("primary n conflicts with success counts")
+        distribution = primary.get("phase_rms_distribution", {})
+        if "n" in distribution and _integer(distribution["n"], "distribution n", 1) != n:
+            raise ValueError("distribution n conflicts with success counts")
+    elif "n" in primary:
+        _integer(primary["n"], "primary n", 1)
+    return estimate
 
 
 def default_rules(primary_rms_threshold=0.01, min_success_fraction=0.9):
+    thresholds = resolve_acceptance({
+        "primary_rms_threshold": primary_rms_threshold,
+        "min_success_fraction": min_success_fraction,
+    })
+
     def primary_rms(results):
-        return results.get("primary", {}).get("phase_rms_median", 1e9) <= primary_rms_threshold
+        value = results.get("primary", {}).get("phase_rms_median")
+        return _nonnegative(value) and _real(value, "RMS") <= thresholds["primary_rms_threshold"]
 
     def null_control(results):
-        return _finite(results.get("null_control", {}).get("phase_rms"))
+        return _nonnegative(results.get("null_control", {}).get("phase_rms"))
 
     def replication(results):
-        return results.get("primary", {}).get("success_fraction", {}).get("estimate", 0.0) >= min_success_fraction
+        return _success_fraction(results.get("primary", {})) >= thresholds["min_success_fraction"]
 
     def scope(results):
         return results.get("scope") == SCOPE
+
+    def acceptance_consistent(results):
+        primary = results.get("primary", {})
+        if "threshold" in primary:
+            reported = _real(primary["threshold"], "primary threshold")
+            if reported != thresholds["primary_rms_threshold"]:
+                return False
+        if "acceptance" in results:
+            reported = resolve_acceptance({"acceptance": results["acceptance"]})
+            if any(reported[name] != thresholds[name] for name in results["acceptance"]):
+                return False
+        return True
 
     return {
         "primary_rms_within_threshold": primary_rms,
         "null_control_reported": null_control,
         "replication_threshold_met": replication,
         "synthetic_scope_declared": scope,
+        "acceptance_thresholds_consistent": acceptance_consistent,
     }
 
 
 def evaluate(results, *, primary_rms_threshold=0.01, min_success_fraction=0.9):
-    # Scope is part of the claim contract, not an optional caller-provided
-    # field. Declare it before evaluating the scope rule so direct callers and
-    # benchmark-generated results follow the same gate semantics.
-    results["scope"] = SCOPE
-    gate = claim_gate(results, default_rules(primary_rms_threshold, min_success_fraction))
+    if not isinstance(results, dict):
+        raise ValueError("results must be a dictionary")
+    results = deepcopy(results)
+    results.setdefault("scope", SCOPE)
+    acceptance = resolve_acceptance({
+        "primary_rms_threshold": primary_rms_threshold,
+        "min_success_fraction": min_success_fraction,
+    })
+    gate = claim_gate(results, default_rules(**acceptance))
+    results["acceptance"] = acceptance
     results["claim_gate_status"] = gate["claim_gate_status"]
     results["claim_gate_checks"] = gate["checks"]
     results["physical_claim"] = False
+    # Smoke metrics alone do not verify a frozen protocol or scientific controls.
+    results["scientific_verdict"] = "inconclusive" if gate["claim_gate_status"] == "pass" else "fail"
+    results["scientific_evidence_status"] = "not_established"
+    results["scientific_evidence"] = {
+        "frozen_protocol_verification": "UNRUN",
+        "scientific_control_evaluation": "UNRUN",
+    }
+    results["preregistered"] = False
+    results["scientific_claim"] = False
+    for name in ("protocol", "control_evidence"):
+        if name in results:
+            results[name] = {"verification_status": "UNRUN"}
+    for name in ("scientific_claim_text", "scientific_headline"):
+        results.pop(name, None)
     return results
 
 
@@ -58,7 +123,8 @@ def headline(results):
     if status == "pass":
         return (
             "Under the specified synthetic pupil and holography configuration, "
-            "the pipeline met the preregistered smoke-benchmark phase-RMS and "
-            "replication checks. This is not evidence about a physical telescope."
+            "the pipeline met the configured smoke-benchmark phase-RMS and "
+            "replication checks. Scientific evidence is not established; "
+            "this is not evidence about a physical telescope."
         )
-    return "The synthetic benchmark did not meet its preregistered claim-gate criteria; no positive claim is supported."
+    return "The synthetic benchmark did not meet its configured smoke criteria; no positive scientific claim is supported."

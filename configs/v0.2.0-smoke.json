@@ -1,5 +1,9 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "2.0",
+  "primary_noise_sigma": 0.05,
+  "acquisition_mode": "local_refinement",
+  "coarse_distance_m": 0.005,
+  "min_success_fraction": 0.9,
   "seeds": [11, 22, 33],
   "noise_levels": [0.0, 0.05],
   "grid": 128,

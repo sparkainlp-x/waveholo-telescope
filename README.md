@@ -1,4 +1,4 @@
-# waveholo-telescope v0.1.0
+# waveholo-telescope
 
 WaveHolo's off-axis digital holography pipeline, pointed at a
 telescope pupil. A distant star through a circular pupil carrying
@@ -42,7 +42,11 @@ amplitude object:
   mask (2 px, because the hard aperture edge is blurred by the
   sideband window). 1 is perfect, 0 is random.
 
-## Measured bars (demo.py, 256x256)
+## Historical demo bars (REPORTED, 256x256)
+
+The numbers below are retained historical demo findings, not current benchmark
+acceptance evidence. The benchmark measurement-path repair and its negative
+smoke outcome are recorded in [REPRODUCIBILITY.md](REPRODUCIBILITY.md).
 
 - T1 focus: aperture-contrast peak 5.138 mm, error +0.138 mm
   against the true 5.00 mm -- but the contrast at the true plane
@@ -86,9 +90,19 @@ amplitude object:
 ## Run it
 
 ```sh
-python3 demo.py          # bars T1-T5 (256x256, seconds)
-python3 tests/tests.py   # 13 tests, from the package root (128x128)
+python -m pip install .
+python -m unittest discover -s tests -p 'test*.py' -v
+waveholo-benchmark --config smoke --output /tmp/waveholo-new-smoke
 ```
+
+`worldholo-benchmark` remains a compatibility alias. The packaged `smoke`
+preset works outside the checkout. Use a new, empty output directory for each
+run. CLI exit 0 means artifact generation succeeded, **not** scientific
+acceptance; inspect both the smoke gate and `scientific_verdict`.
+
+The presets perform **local refinement around a supplied coarse distance**,
+not blind acquisition. Blind mode requires an independently fixed
+`search_range_m` and no coarse distance. No frozen protocol has been verified.
 
 ## Wavefront Clinic
 
@@ -167,8 +181,8 @@ pipeline, its measured benchmarks, or the physical-readiness protocol.
 - Piston is unobservable, tip/tilt are excluded, the pupil is an
   ideal disk. A real pupil (obstruction, spiders, segments,
   atmosphere) would need those terms added and re-measured.
-- Authorship: Brisson only. No other author's code or paradigm
-  is contained in this package.
+- Repair overlap and attribution are recorded in `REPRODUCIBILITY.md`;
+  see Git history for contributions.
 
 ## Licence
 

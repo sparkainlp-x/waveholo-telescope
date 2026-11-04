@@ -34,6 +34,10 @@ Issues = "https://github.com/sparkainlp-x/waveholo-telescope/issues"
 
 [project.scripts]
 worldholo-benchmark = "waveholo_telescope.benchmark:main"
+waveholo-benchmark = "waveholo_telescope.benchmark:main"
+
+[tool.setuptools.package-data]
+waveholo_telescope = ["configs/*.json"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
