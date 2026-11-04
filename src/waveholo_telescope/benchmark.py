@@ -22,7 +22,7 @@ from .analysis import focus_sweep, parabolic_peak
 from .claims import evaluate, headline
 from .hologram import record_hologram, reconstruct_field
 from .metrics import eroded_mask, phase_agreement, phase_rms_error, phase_variance
-from .propagation import CAR_DEFAULT, DX, WL, WIN_DEFAULT, angular_spectrum
+from .propagation import DX, WL, angular_spectrum
 from .pupil import pupil_field, pupil_grid
 from .statistics import bootstrap_median_interval, median_and_iqr, wilson_interval
 
@@ -55,23 +55,45 @@ def _add_sensor_noise(hologram, sigma_relative, rng):
     return np.clip(noisy, 0.0, None)
 
 
+def _resolve_sampling(n, carrier, window):
+    if not isinstance(n, (int, np.integer)) or isinstance(n, (bool, np.bool_)):
+        raise ValueError("grid size must be an integer")
+    if (carrier is None) != (window is None):
+        raise ValueError("carrier and sideband window must be supplied together")
+    if carrier is None:
+        presets = {64: (20, 12), 128: (40, 24), 256: (80, 48)}
+        try:
+            carrier, window = presets[n]
+        except KeyError as exc:
+            raise ValueError(
+                "carrier and sideband window are required for non-preset grid sizes"
+            ) from exc
+    if any(
+        not isinstance(value, (int, np.integer)) or isinstance(value, (bool, np.bool_))
+        for value in (carrier, window)
+    ):
+        raise ValueError("carrier and sideband window must be integers")
+    if not (0 < carrier < n / 2):
+        raise ValueError("carrier must satisfy 0 < carrier < n/2")
+    if not (0 <= window < n / 2):
+        raise ValueError("sideband window must satisfy 0 <= window < n/2")
+    if carrier + window > n / 2:
+        raise ValueError("carrier plus sideband window must not exceed n/2")
+    return int(carrier), int(window)
+
+
 def run_condition(*, seed, n=128, radius=32, true_distance_m=5.0e-3,
-                  carrier=CAR_DEFAULT, window=WIN_DEFAULT,
+                  carrier=None, window=None,
                   noise_sigma=0.05, sweep_half_range_m=1.0e-3,
                   sweep_points=21, aberration_scale=1.0):
+    carrier, window = _resolve_sampling(n, carrier, window)
+    if not isinstance(radius, (int, np.integer)) or isinstance(radius, (bool, np.bool_)):
+        raise ValueError("pupil radius must be an integer")
     if n < 64 or radius <= 0 or radius >= n // 2:
         raise ValueError("require n >= 64 and 0 < radius < n/2")
-    if sweep_points < 3:
+    if (not isinstance(sweep_points, (int, np.integer))
+            or isinstance(sweep_points, (bool, np.bool_)) or sweep_points < 3):
         raise ValueError("sweep_points must be at least 3")
-    # Keep the library defaults usable for the small grids used by unit tests.
-    # The production configuration supplies its own carrier/window values.
-    if carrier == CAR_DEFAULT and window == WIN_DEFAULT:
-        window = min(window, max(1, n // 4 - 1))
-        carrier = min(carrier, n // 2 - window - 1)
-    if not (0 < carrier < n // 2):
-        raise ValueError("carrier must satisfy 0 < carrier < n/2")
-    if not (0 <= window < n // 2) or carrier + window > n // 2:
-        raise ValueError("sideband window must fit within the centred Fourier spectrum")
     rng = np.random.default_rng(seed)
 
     pupil, mask, true_phase = pupil_field(
@@ -91,19 +113,19 @@ def run_condition(*, seed, n=128, radius=32, true_distance_m=5.0e-3,
         true_distance_m + sweep_half_range_m,
         sweep_points,
     )
-    sweep_distances, contrasts = focus_sweep(noisy_hologram, mask, distances, dx=DX, wl=WL)
+    sweep_distances, contrasts = focus_sweep(baseband, mask, distances, dx=DX, wl=WL)
     focus = parabolic_peak(sweep_distances, contrasts)
     measured_distance = focus["refined_distance_m"]
 
-    reconstructed_measured = angular_spectrum(noisy_hologram, -measured_distance, dx=DX, wl=WL)
-    reconstructed_true = angular_spectrum(noisy_hologram, -true_distance_m, dx=DX, wl=WL)
+    reconstructed_measured = angular_spectrum(baseband, -measured_distance, dx=DX, wl=WL)
+    reconstructed_true = angular_spectrum(baseband, -true_distance_m, dx=DX, wl=WL)
     rho, _, _ = pupil_grid(n, radius)
     eroded = eroded_mask(rho, radius, 2)
 
     rms_measured = phase_rms_error(reconstructed_measured, true_phase, eroded)
     rms_true = phase_rms_error(reconstructed_true, true_phase, eroded)
     agreement = phase_agreement(reconstructed_measured, true_phase, eroded)
-    edge_field = angular_spectrum(noisy_hologram, -float(sweep_distances[-1]), dx=DX, wl=WL)
+    edge_field = angular_spectrum(baseband, -float(sweep_distances[-1]), dx=DX, wl=WL)
 
     return {
         "seed": int(seed),
@@ -139,14 +161,14 @@ def run_benchmark(config):
         for seed in seeds:
             raw.append(run_condition(
                 seed=seed,
-                n=int(config["grid"]),
-                radius=int(config["pupil_radius_px"]),
+                n=config["grid"],
+                radius=config["pupil_radius_px"],
                 true_distance_m=float(config["true_distance_m"]),
-                carrier=int(config.get("carrier_bins", CAR_DEFAULT)),
-                window=int(config.get("sideband_half_width_bins", WIN_DEFAULT)),
+                carrier=config.get("carrier_bins"),
+                window=config.get("sideband_half_width_bins"),
                 noise_sigma=noise,
                 sweep_half_range_m=float(config.get("sweep_half_range_m", 1.0e-3)),
-                sweep_points=int(config.get("sweep_points", 21)),
+                sweep_points=config.get("sweep_points", 21),
                 aberration_scale=float(config.get("aberration_scale", 1.0)),
             ))
 
@@ -158,11 +180,11 @@ def run_benchmark(config):
 
     null = run_condition(
         seed=seeds[0],
-        n=int(config["grid"]),
-        radius=int(config["pupil_radius_px"]),
+        n=config["grid"],
+        radius=config["pupil_radius_px"],
         true_distance_m=float(config["true_distance_m"]),
-        carrier=int(config.get("carrier_bins", CAR_DEFAULT)),
-        window=int(config.get("sideband_half_width_bins", WIN_DEFAULT)),
+        carrier=config.get("carrier_bins"),
+        window=config.get("sideband_half_width_bins"),
         noise_sigma=0.0,
         aberration_scale=0.0,
     )
