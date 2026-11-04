@@ -20,7 +20,7 @@ import numpy as np
 
 from .analysis import focus_sweep, parabolic_peak
 from .claims import evaluate, headline
-from .hologram import offaxis_field
+from .hologram import record_hologram, reconstruct_field
 from .metrics import eroded_mask, phase_agreement, phase_rms_error, phase_variance
 from .propagation import CAR_DEFAULT, DX, WL, WIN_DEFAULT, angular_spectrum
 from .pupil import pupil_field, pupil_grid
@@ -63,6 +63,15 @@ def run_condition(*, seed, n=128, radius=32, true_distance_m=5.0e-3,
         raise ValueError("require n >= 64 and 0 < radius < n/2")
     if sweep_points < 3:
         raise ValueError("sweep_points must be at least 3")
+    # Keep the library defaults usable for the small grids used by unit tests.
+    # The production configuration supplies its own carrier/window values.
+    if carrier == CAR_DEFAULT and window == WIN_DEFAULT:
+        window = min(window, max(1, n // 4 - 1))
+        carrier = min(carrier, n // 2 - window - 1)
+    if not (0 < carrier < n // 2):
+        raise ValueError("carrier must satisfy 0 < carrier < n/2")
+    if not (0 <= window < n // 2) or carrier + window > n // 2:
+        raise ValueError("sideband window must fit within the centred Fourier spectrum")
     rng = np.random.default_rng(seed)
 
     pupil, mask, true_phase = pupil_field(
@@ -73,8 +82,9 @@ def run_condition(*, seed, n=128, radius=32, true_distance_m=5.0e-3,
         coma_x=0.2 * aberration_scale,
     )
     sensor = angular_spectrum(pupil, true_distance_m, dx=DX, wl=WL)
-    baseband = offaxis_field(sensor, carrier, window)
-    noisy_hologram = _add_sensor_noise(baseband, noise_sigma, rng)
+    hologram = record_hologram(sensor, carrier)
+    noisy_hologram = _add_sensor_noise(hologram, noise_sigma, rng)
+    baseband = reconstruct_field(noisy_hologram, carrier, window)
 
     distances = np.linspace(
         max(0.0, true_distance_m - sweep_half_range_m),

@@ -42,10 +42,13 @@ def default_rules(primary_rms_threshold=0.01, min_success_fraction=0.9):
 
 
 def evaluate(results, *, primary_rms_threshold=0.01, min_success_fraction=0.9):
+    # Scope is part of the claim contract, not an optional caller-provided
+    # field. Declare it before evaluating the scope rule so direct callers and
+    # benchmark-generated results follow the same gate semantics.
+    results["scope"] = SCOPE
     gate = claim_gate(results, default_rules(primary_rms_threshold, min_success_fraction))
     results["claim_gate_status"] = gate["claim_gate_status"]
     results["claim_gate_checks"] = gate["checks"]
-    results["scope"] = SCOPE
     results["physical_claim"] = False
     return results
 
