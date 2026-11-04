@@ -24,6 +24,14 @@ Use this checklist before publishing any tagged release.
 - [ ] Benchmark dimensions, wavelength, pixel pitch, carrier frequency, sideband width, and propagation distance are recorded.
 - [ ] The complete command sequence regenerates benchmark outputs.
 - [ ] Release assets are retained unchanged after publication.
+- [ ] Build wheel and sdist; install the exact wheel and a wheel rebuilt from
+      that exact sdist in fresh environments, outside the checkout.
+- [ ] Both CLI aliases resolve packaged configs and produce strict JSON with
+      nonempty provenance and valid checksums.
+- [ ] Artifact integrity is reported independently from smoke acceptance and
+      scientific verdicts; honest negative-result artifacts remain releasable.
+- [ ] No positive scientific or preregistration claim is inferred from a clean
+      install, green CI, or a smoke pass.
 
 ## Versioning
 

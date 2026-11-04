@@ -4,7 +4,11 @@
 
 WaveHolo Telescope is a synthetic, NumPy-based prototype for off-axis digital holography of a circular telescope pupil. This document defines what the project may claim, how results are validated, and which claims are prohibited.
 
-## Validated claims
+## Supported scope (not a positive scientific verdict)
+
+An engineering smoke pass establishes only the configured checks for that
+synthetic run. Missing controls or an unverified frozen protocol prevent a
+positive scientific verdict. No current smoke run is called preregistered.
 
 The project may claim only that its pipeline can, under the documented synthetic benchmark conditions:
 
@@ -26,6 +30,14 @@ The project may claim only that its pipeline can, under the documented synthetic
 | Circular phase agreement | Global phase-pattern agreement | Dimensionless score |
 | Null-control RMS | Reconstruction floor without a meaningful pupil signal | Waves RMS |
 | Noise robustness | Metric stability under additive noise | Metric versus noise level |
+
+The legacy `null_control` output is explicitly an **aberration-free pupil**,
+not an empty-pupil/no-signal control. The latter remains UNRUN. The deliberately
+incorrect intensity-propagation control is computed, not assigned a verdict.
+Phase-variance localization failure is retained only as a prior finding unless
+remeasured. Local focus refinement uses a supplied coarse distance and must
+not be described as blind acquisition. Blind mode requires an independently
+fixed search range, unchanged when simulated truth changes.
 
 ## Required controls
 

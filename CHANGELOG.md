@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased focused repair (2026-11-04)
+
+- Route reconstructed complex baseband through benchmark measurement; add
+  known-field, consumption and deliberately incorrect intensity controls.
+- Share validated acceptance thresholds and explicitly name the primary
+  noise condition; distinguish coarse-prior refinement from blind acquisition.
+- Fail closed on invalid claims, counts and inputs; separate engineering
+  acceptance from unverified scientific evidence and preserve negative results.
+- Validate statistical reference cases and correct the documented equal-group
+  independent two-proportion power formula; BH ordering remains unchanged.
+- Use strict JSON and schema 2.0 with JSON-null missing diagnostics, installed
+  package provenance, packaged presets and exact wheel/sdist smoke validation.
+- Preserve historical artifacts and demo bars as prior findings, not evidence
+  for the repaired benchmark. Smoke still fails the unchanged 0.01-wave target.
+- Attribute overlapping repair patterns from PR #2 and #4 and evidence-scope
+  guidance from #3 in `REPRODUCIBILITY.md`; no PR was merged.
+
 ## Unreleased scientific-readiness pass
 
 - Added explicit validation for square fields, finite holograms, physical

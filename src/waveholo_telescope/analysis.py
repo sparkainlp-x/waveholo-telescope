@@ -70,9 +70,11 @@ def parabolic_peak(distances, scores):
         raise ValueError("distances and scores must be matching non-empty 1-D arrays")
     if not np.isfinite(d).all() or not np.isfinite(s).all():
         raise ValueError("distances and scores must be finite")
+    if (d < 0).any() or (np.diff(d) <= 0).any():
+        raise ValueError("distances must be non-negative and strictly increasing")
     i = int(np.argmax(s))
     refined = float(d[i])
-    curvature = np.nan
+    curvature = None
     if 0 < i < d.size - 1:
         step_left, step_right = d[i] - d[i - 1], d[i + 1] - d[i]
         if np.isclose(step_left, step_right) and step_left > 0:
@@ -85,6 +87,6 @@ def parabolic_peak(distances, scores):
         "refined_distance_m": refined,
         "score": float(s[i]),
         "curvature_per_m2": curvature,
-        "resolution_half_step_m": float(0.5 * np.min(np.diff(d))) if d.size > 1 else np.nan,
+        "resolution_half_step_m": float(0.5 * np.min(np.diff(d))) if d.size > 1 else None,
         "at_boundary": bool(i == 0 or i == d.size - 1),
     }

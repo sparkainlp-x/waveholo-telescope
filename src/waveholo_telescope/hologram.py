@@ -23,8 +23,11 @@ def record_hologram(sensor_field, car=CAR_DEFAULT):
     field = np.asarray(sensor_field, dtype=complex)
     if field.ndim != 2 or field.shape[0] != field.shape[1]:
         raise ValueError("sensor_field must be a square 2D array")
+    if not np.isfinite(field).all():
+        raise ValueError("sensor_field must contain only finite values")
     n = field.shape[0]
-    if not (0 < car < n // 2):
+    if (not isinstance(car, (int, np.integer)) or isinstance(car, (bool, np.bool_))
+            or not (0 < car < n / 2)):
         raise ValueError(f"carrier must satisfy 0 < car < {n // 2}")
     y, x = np.mgrid[0:n, 0:n]
     ref = np.exp(2j * np.pi * (car * x / n))
@@ -39,11 +42,12 @@ def reconstruct_field(hologram, car=CAR_DEFAULT, win=WIN_DEFAULT):
     if not np.isfinite(holo).all():
         raise ValueError("hologram must contain only finite values")
     n = holo.shape[0]
-    if not isinstance(car, (int, np.integer)) or not isinstance(win, (int, np.integer)):
+    if any(not isinstance(value, (int, np.integer)) or isinstance(value, (bool, np.bool_))
+           for value in (car, win)):
         raise ValueError("carrier and window must be integers")
-    if not (0 < car < n) or not (0 <= win < n // 2):
-        raise ValueError("need 0 < carrier < n and 0 <= window < n/2")
-    if car - win < -n // 2 or car + win > n // 2:
+    if not (0 < car < n / 2) or not (0 <= win < n / 2):
+        raise ValueError("need 0 < carrier < n/2 and 0 <= window < n/2")
+    if car + win > n / 2:
         raise ValueError("sideband window does not fit in the centred Fourier spectrum")
     spec = np.fft.fftshift(np.fft.fft2(holo))
     c = n // 2
